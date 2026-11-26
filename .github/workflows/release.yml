@@ -1,0 +1,82 @@
+name: Release
+
+# Publishes new versions of the NuGet packages when releasable commits land on main.
+# semantic-release reads the Conventional Commit messages since the last v* tag:
+#   fix: → patch · feat: → minor · feat!: or a "BREAKING CHANGE:" footer → major
+#   anything else (docs:, chore:, ci:, refactor:, test: …) → no release
+# The version is stamped into the packages at build time; nothing is committed back.
+#
+# nuget.org authentication uses Trusted Publishing (OIDC): no API key is stored.
+# On nuget.org, the account that owns the packages needs a Trusted Publishing policy that names
+# this repository, this workflow file (release.yml) and the "nuget" environment. The repository
+# variable NUGET_USER holds that account's nuget.org user name. Renaming the workflow file or the
+# environment breaks publishing until the policy is updated.
+#
+# Until NUGET_USER is set, the run builds and tests main and then stops: nothing is tagged,
+# released or pushed to nuget.org.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: nuget
+    permissions:
+      contents: write # push the version tag and create the GitHub Release
+      issues: write # comment on issues resolved by the release
+      pull-requests: write # comment on pull requests included in the release
+      id-token: write # GitHub OIDC token, exchanged for a short-lived nuget.org API key
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # semantic-release needs the full history and tags
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install release tooling
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build
+        run: dotnet build ShkoOnline.EarlyBound.slnx -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test --solution ShkoOnline.EarlyBound.slnx -c Release --no-build
+
+      - name: Sign in to nuget.org
+        if: vars.NUGET_USER != ''
+        id: nuget
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      # prepare packs both packages with the new version; publish pushes them to nuget.org,
+      # then the GitHub Release is created with the packages attached.
+      - name: Release
+        if: vars.NUGET_USER != ''
+        run: npx --no-install semantic-release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}

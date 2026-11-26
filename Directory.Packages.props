@@ -1,0 +1,37 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Lets the versions below also replace packages that are only referenced indirectly. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <!--
+      The lowest Roslyn the analyzer package supports. Everything that ships inside the NuGet
+      package compiles against this version so it loads in Visual Studio 2022 17.8+,
+      the .NET 8 SDK and later, and the VS Code C# extension.
+    -->
+    <RoslynVersion>4.8.0</RoslynVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Analyzer package -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynVersion)" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(RoslynVersion)" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Features" Version="$(RoslynVersion)" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+    <PackageVersion Include="PolySharp" Version="1.15.0" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+
+    <!-- .NET tool -->
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.2.27" />
+    <PackageVersion Include="Spectre.Console" Version="0.57.2" />
+    <PackageVersion Include="System.CommandLine" Version="3.0.0" />
+
+    <!-- Tests -->
+    <PackageVersion Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.60" />
+    <!-- Patched versions of packages the Dataverse client still references in vulnerable versions. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.15" />
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
+  </ItemGroup>
+
+</Project>

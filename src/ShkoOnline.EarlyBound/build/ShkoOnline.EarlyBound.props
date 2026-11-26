@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Shko Online's Early Bound
+    Makes the settings and item metadata below visible to the source generator and the
+    autocomplete provider.
+  -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="RootNamespace" />
+    <CompilerVisibleProperty Include="EarlyBoundNamespace" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="EarlyBound" />
+  </ItemGroup>
+
+</Project>

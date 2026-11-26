@@ -1,0 +1,98 @@
+# Shko Online's Early Bound - Dataverse metadata
+# Written by 'earlybound pull'. Do not edit: the next pull overwrites this file.
+# To change what is generated from it, edit earlybound.yaml.
+#
+entities:
+  - logicalName: contact
+    schemaName: Contact
+    displayName: Contact
+    displayCollectionName: Contacts
+    description: Person with whom a business unit has a relationship, such as customer, supplier, and colleague.
+    entitySetName: contacts
+    logicalCollectionName: contacts
+    primaryIdAttribute: contactid
+    primaryNameAttribute: fullname
+    objectTypeCode: 2
+    ownershipType: UserOwned
+    attributes:
+      - logicalName: birthdate
+        schemaName: BirthDate
+        type: DateTime
+        displayName: Birthday
+        dateTimeBehavior: DateOnly
+      - logicalName: contactid
+        schemaName: ContactId
+        type: Uniqueidentifier
+        displayName: Contact
+        description: Unique identifier of the contact.
+        requiredLevel: SystemRequired
+        isValidForUpdate: false
+      - logicalName: emailaddress1
+        schemaName: EMailAddress1
+        type: String
+        displayName: Email
+        maxLength: 100
+        format: Email
+      - logicalName: firstname
+        schemaName: FirstName
+        type: String
+        displayName: First Name
+        maxLength: 50
+      - logicalName: fullname
+        schemaName: FullName
+        type: String
+        displayName: Full Name
+        isValidForCreate: false
+        isValidForUpdate: false
+        maxLength: 160
+      - logicalName: gendercode
+        schemaName: GenderCode
+        type: Picklist
+        displayName: Gender
+        optionSet:
+          name: contact_gendercode
+          displayName: Gender
+          type: Picklist
+          options:
+            - {value: 1, label: Male}
+            - {value: 2, label: Female}
+      - logicalName: lastname
+        schemaName: LastName
+        type: String
+        displayName: Last Name
+        requiredLevel: ApplicationRequired
+        maxLength: 50
+      - logicalName: parentcustomerid
+        schemaName: ParentCustomerId
+        type: Customer
+        displayName: Company Name
+        targets: [account, contact]
+      - logicalName: statecode
+        schemaName: StateCode
+        type: State
+        displayName: Status
+        isValidForCreate: false
+        optionSet:
+          name: contact_statecode
+          displayName: Status
+          type: State
+          options:
+            - {value: 0, label: Active, invariantName: Active, defaultStatus: 1}
+            - {value: 1, label: Inactive, invariantName: Inactive, defaultStatus: 2}
+      - logicalName: statuscode
+        schemaName: StatusCode
+        type: Status
+        displayName: Status Reason
+        optionSet:
+          name: contact_statuscode
+          displayName: Status Reason
+          type: Status
+          options:
+            - {value: 1, label: Active, state: 0}
+            - {value: 2, label: Inactive, state: 1}
+    manyToOne:
+      - {schemaName: contact_customer_accounts, entity: account, attribute: parentcustomerid}
+    oneToMany:
+      - {schemaName: account_primary_contact, entity: account, attribute: primarycontactid}
+    manyToMany:
+      - {schemaName: sho_account_contact_stakeholders, entity: account, intersectEntity: sho_account_contact}

@@ -1,0 +1,91 @@
+# Shko Online's Early Bound - Dataverse metadata
+# Written by 'earlybound pull'. Do not edit: the next pull overwrites this file.
+# To change what is generated from it, edit earlybound.yaml.
+#
+entities:
+  - logicalName: sho_project
+    schemaName: sho_project
+    displayName: Project
+    displayCollectionName: Projects
+    description: >-
+      A piece of work delivered to a customer.
+
+      Tracks budget & <progress>.
+    entitySetName: sho_projects
+    logicalCollectionName: sho_projects
+    primaryIdAttribute: sho_projectid
+    primaryNameAttribute: sho_name
+    objectTypeCode: 10042
+    ownershipType: UserOwned
+    isCustomEntity: true
+    attributes:
+      - logicalName: sho_accountid
+        schemaName: sho_accountid
+        type: Lookup
+        displayName: Customer
+        targets: [account]
+      - logicalName: sho_budgetstatus
+        schemaName: sho_budgetstatus
+        type: Picklist
+        displayName: Budget Status
+        globalOptionSet: sho_budgetstatus
+      - logicalName: sho_duedate
+        schemaName: sho_duedate
+        type: DateTime
+        displayName: Due Date
+        dateTimeBehavior: DateOnly
+      - logicalName: sho_estimatedhours
+        schemaName: sho_estimatedhours
+        type: Decimal
+        displayName: Estimated Hours
+        precision: 2
+      - logicalName: sho_name
+        schemaName: sho_name
+        type: String
+        displayName: Name
+        requiredLevel: ApplicationRequired
+        maxLength: 100
+      - logicalName: sho_progress
+        schemaName: sho_progress
+        type: Double
+        displayName: Progress
+      - logicalName: sho_projectid
+        schemaName: sho_projectid
+        type: Uniqueidentifier
+        displayName: Project
+        requiredLevel: SystemRequired
+        isValidForUpdate: false
+      - logicalName: sho_specification
+        schemaName: sho_specification
+        type: File
+        displayName: Specification
+        isValidForCreate: false
+        isValidForUpdate: false
+      - logicalName: statecode
+        schemaName: statecode
+        type: State
+        displayName: Status
+        isValidForCreate: false
+        optionSet:
+          name: sho_project_statecode
+          displayName: Status
+          type: State
+          options:
+            - {value: 0, label: Active, invariantName: Active, defaultStatus: 1}
+            - {value: 1, label: Inactive, invariantName: Inactive, defaultStatus: 2}
+      - logicalName: statuscode
+        schemaName: statuscode
+        type: Status
+        displayName: Status Reason
+        optionSet:
+          name: sho_project_statuscode
+          displayName: Status Reason
+          type: Status
+          options:
+            - {value: 1, label: In Progress, state: 0}
+            - {value: 100000000, label: On Hold, state: 0}
+            - {value: 2, label: Completed, state: 1}
+            - {value: 100000001, label: On Hold, state: 1}
+            - {value: 100000002, label: 1st Review, state: 0}
+    manyToOne:
+      - {schemaName: sho_account_sho_project, entity: account, attribute: sho_accountid}

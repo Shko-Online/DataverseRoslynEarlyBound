@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ShkoOnline.EarlyBound.Completion/ShkoOnline.EarlyBound.Completion.csproj" />
+    <Project Path="src/ShkoOnline.EarlyBound.Core/ShkoOnline.EarlyBound.Core.csproj" />
+    <Project Path="src/ShkoOnline.EarlyBound.Generator/ShkoOnline.EarlyBound.Generator.csproj" />
+    <Project Path="src/ShkoOnline.EarlyBound.Tool/ShkoOnline.EarlyBound.Tool.csproj" />
+    <Project Path="src/ShkoOnline.EarlyBound/ShkoOnline.EarlyBound.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ShkoOnline.EarlyBound.Tests/ShkoOnline.EarlyBound.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

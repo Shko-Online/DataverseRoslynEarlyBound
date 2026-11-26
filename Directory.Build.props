@@ -1,0 +1,45 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <TreatWarningsAsErrors Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- One output tree for the whole repository: artifacts/bin, artifacts/obj, artifacts/package -->
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+  </PropertyGroup>
+
+  <!-- Version: semantic-release passes -p:Version=x.y.z when publishing. -->
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix Condition="'$(Version)' == '' and '$(ContinuousIntegrationBuild)' != 'true'">local</VersionSuffix>
+  </PropertyGroup>
+
+  <!-- Package identity shared by every package in this repository -->
+  <PropertyGroup>
+    <Product>Shko Online's Early Bound</Product>
+    <Authors>Shko Online LLC</Authors>
+    <Company>Shko Online LLC</Company>
+    <Copyright>Copyright © 2026 Shko Online LLC</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Shko-Online/DataverseRoslynEarlyBound</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Shko-Online/DataverseRoslynEarlyBound.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>dataverse;dynamics365;powerplatform;powerapps;crm;xrm;earlybound;early-bound;source-generator;roslyn;intellisense</PackageTags>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)assets/icon.png" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)NOTICE" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+</Project>

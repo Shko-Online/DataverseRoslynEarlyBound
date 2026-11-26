@@ -1,0 +1,29 @@
+# Shko Online's Early Bound - Dataverse metadata
+# Written by 'earlybound pull'. Do not edit: the next pull overwrites this file.
+# To change what is generated from it, edit earlybound.yaml.
+#
+entities:
+  - logicalName: activityparty
+    schemaName: ActivityParty
+    displayName: Activity Party
+    description: Person or group associated with an activity. An activity can have multiple activity parties.
+    entitySetName: activityparties
+    logicalCollectionName: activityparties
+    primaryIdAttribute: activitypartyid
+    objectTypeCode: 135
+    ownershipType: None
+    attributes:
+      - logicalName: activitypartyid
+        schemaName: ActivityPartyId
+        type: Uniqueidentifier
+        isValidForCreate: false
+        isValidForUpdate: false
+      - logicalName: addressused
+        schemaName: AddressUsed
+        type: String
+        maxLength: 200
+      - logicalName: partyid
+        schemaName: PartyId
+        type: Lookup
+        displayName: Party
+        targets: [account, contact]

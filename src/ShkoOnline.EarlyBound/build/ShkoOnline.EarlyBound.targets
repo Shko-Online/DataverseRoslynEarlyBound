@@ -1,0 +1,36 @@
+<Project>
+
+  <!--
+    Shko Online's Early Bound
+    Hands the metadata files to the compiler as additional files.
+
+    By default these are earlybound.yaml next to the project file, and every YAML file in the
+    Metadata folder. To change that, set in the project file:
+
+      <EarlyBoundMetadataPath>Dataverse</EarlyBoundMetadataPath>    another folder (the "pull.output" of earlybound.yaml)
+      <EnableDefaultEarlyBoundItems>false</EnableDefaultEarlyBoundItems>   no defaults at all
+
+    and add files of your own with:
+
+      <EarlyBoundMetadata Include="..\Shared\Metadata\**\*.yaml" />
+
+    <EarlyBoundNamespace>Contoso.Model</EarlyBoundNamespace> overrides the namespace of the generated code.
+  -->
+  <PropertyGroup>
+    <EarlyBoundMetadataPath Condition="'$(EarlyBoundMetadataPath)' == ''">Metadata</EarlyBoundMetadataPath>
+    <EnableDefaultEarlyBoundItems Condition="'$(EnableDefaultEarlyBoundItems)' == ''">true</EnableDefaultEarlyBoundItems>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableDefaultEarlyBoundItems)' == 'true'">
+    <EarlyBoundMetadata Include="$(MSBuildProjectDirectory)\earlybound.yaml" Condition="Exists('$(MSBuildProjectDirectory)\earlybound.yaml')" />
+    <EarlyBoundMetadata Include="$(MSBuildProjectDirectory)\earlybound.yml" Condition="Exists('$(MSBuildProjectDirectory)\earlybound.yml')" />
+    <EarlyBoundMetadata Include="$(EarlyBoundMetadataPath)\**\*.yaml;$(EarlyBoundMetadataPath)\**\*.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A file listed twice would reach the generator twice. -->
+    <AdditionalFiles Remove="@(EarlyBoundMetadata)" />
+    <AdditionalFiles Include="@(EarlyBoundMetadata)" EarlyBound="true" />
+  </ItemGroup>
+
+</Project>

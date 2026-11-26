@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    The samples are consumers: they use the packages the way any project would, from a NuGet
+    feed. They deliberately do not inherit the repository's build settings.
+
+    Build the packages first (from the repository root):
+
+      dotnet pack -c Release
+      dotnet build samples/Samples.slnx
+  -->
+  <PropertyGroup>
+    <EarlyBoundVersion Condition="'$(EarlyBoundVersion)' == ''">0.1.0-local</EarlyBoundVersion>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!-- A private package folder, so a rebuilt package with the same version is picked up after deleting it. -->
+    <RestorePackagesPath>$(MSBuildThisFileDirectory).packages</RestorePackagesPath>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

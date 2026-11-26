@@ -1,0 +1,11 @@
+# Fixture: a custom global choice shared by two tables.
+optionSets:
+  - name: sho_budgetstatus
+    displayName: Budget Status
+    description: How a budget stands.
+    type: Picklist
+    options:
+      - { value: 100000000, label: No Committed Budget }
+      - { value: 100000001, label: May Buy }
+      - { value: 100000002, label: Can Buy, description: "Budget is approved." }
+      - { value: 100000003, label: Will Buy, color: "#0070F4" }

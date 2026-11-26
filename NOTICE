@@ -1,0 +1,15 @@
+Shko Online's Early Bound
+Copyright 2026 Shko Online LLC
+
+This product includes software developed at Shko Online LLC (https://shko.online/).
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+This product contains third-party material. Its notices and licence texts are in
+THIRD-PARTY-NOTICES.md:
+
+  - The naming conventions, the PascalCasing algorithm and the English word list used
+    by it are derived from "DLaB.Xrm.XrmToolBoxTools" (the Early Bound Generator) by
+    Daryl LaBar, MIT License.
+  - YamlDotNet by Antoine Aubry and contributors, MIT License, is redistributed inside
+    the ShkoOnline.EarlyBound NuGet package.

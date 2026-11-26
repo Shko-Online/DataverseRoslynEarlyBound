@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The NuGet package. It has no code of its own: it carries the generator, the autocomplete
+    provider and what they depend on as analyzers, plus the MSBuild files that hand the YAML
+    metadata to them.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>ShkoOnline.EarlyBound</PackageId>
+    <Title>Shko Online's Early Bound</Title>
+    <Description>Early-bound Dataverse classes generated at build time from YAML metadata, with IntelliSense for logical names, FetchXML and choice values in late-bound code. A Roslyn source generator and completion provider for Visual Studio, VS Code and Rider. Download the metadata with the ShkoOnline.EarlyBound.Tool .NET tool.</Description>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- NU5128: the package deliberately has no lib folder. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddAnalyzersToPackage</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShkoOnline.EarlyBound.Generator\ShkoOnline.EarlyBound.Generator.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\ShkoOnline.EarlyBound.Completion\ShkoOnline.EarlyBound.Completion.csproj" PrivateAssets="all" />
+    <PackageReference Include="YamlDotNet" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\**" Pack="true" PackagePath="build\" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <Target Name="AddAnalyzersToPackage">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(OutputPath)ShkoOnline.EarlyBound.Generator.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(OutputPath)ShkoOnline.EarlyBound.Completion.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(OutputPath)ShkoOnline.EarlyBound.Core.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="$(OutputPath)YamlDotNet.dll" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
+
+</Project>

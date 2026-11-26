@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test and package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux is the fast feedback; Windows is where most Dataverse developers build.
+        os: [ubuntu-latest, windows-latest]
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      # Warnings are errors here (ContinuousIntegrationBuild), NuGet audit findings included.
+      - name: Build
+        run: dotnet build ShkoOnline.EarlyBound.slnx -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test --solution ShkoOnline.EarlyBound.slnx -c Release --no-build
+
+      - name: Package
+        run: dotnet pack ShkoOnline.EarlyBound.slnx -c Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=0.0.1-ci
+
+      # The samples consume the packages just built, the way a user's project would:
+      # a .NET Framework plug-in project (C# 7.3) and a modern .NET app.
+      - name: Build the samples against the packages
+        run: dotnet build samples/Samples.slnx -p:EarlyBoundVersion=0.0.1-ci
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: packages
+          path: artifacts/package/release/*.nupkg
+          retention-days: 7

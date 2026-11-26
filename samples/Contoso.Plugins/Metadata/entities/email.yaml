@@ -1,0 +1,42 @@
+# Shko Online's Early Bound - Dataverse metadata
+# Written by 'earlybound pull'. Do not edit: the next pull overwrites this file.
+# To change what is generated from it, edit earlybound.yaml.
+#
+entities:
+  - logicalName: email
+    schemaName: Email
+    displayName: Email
+    displayCollectionName: Email Messages
+    description: Activity that is delivered using email protocols.
+    entitySetName: emails
+    logicalCollectionName: emails
+    primaryIdAttribute: activityid
+    primaryNameAttribute: subject
+    objectTypeCode: 4202
+    ownershipType: UserOwned
+    isActivity: true
+    attributes:
+      - logicalName: activityid
+        schemaName: ActivityId
+        type: Uniqueidentifier
+        displayName: Email Message
+        requiredLevel: SystemRequired
+        isValidForUpdate: false
+      - logicalName: from
+        schemaName: From
+        type: PartyList
+        displayName: From
+      - logicalName: regardingobjectid
+        schemaName: RegardingObjectId
+        type: Lookup
+        displayName: Regarding
+        targets: [account, contact]
+      - logicalName: subject
+        schemaName: Subject
+        type: String
+        displayName: Subject
+        maxLength: 800
+      - logicalName: to
+        schemaName: To
+        type: PartyList
+        displayName: To

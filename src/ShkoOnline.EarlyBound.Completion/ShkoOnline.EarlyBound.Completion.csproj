@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>ShkoOnline.EarlyBound.Completion</RootNamespace>
+    <Description>IntelliSense completion provider of Shko Online's Early Bound: logical names, FetchXML and choice values.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" PrivateAssets="all" />
+    <PackageReference Include="PolySharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShkoOnline.EarlyBound.Core\ShkoOnline.EarlyBound.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShkoOnline.EarlyBound.Tests" />
+  </ItemGroup>
+
+</Project>

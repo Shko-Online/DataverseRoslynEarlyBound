@@ -1,0 +1,29 @@
+# Shko Online's Early Bound
+# https://github.com/Shko-Online/DataverseRoslynEarlyBound
+#
+# 'earlybound pull' reads the "pull" section and downloads metadata into the output folder.
+# The ShkoOnline.EarlyBound package reads the "generator" section whenever the project builds.
+
+# The Dataverse environment metadata is pulled from.
+environment: https://contoso.crm4.dynamics.com
+
+pull:
+  # Tables to pull, by logical name. * matches any run of characters, for example "sho_*".
+  entities:
+    - account
+    - contact
+    - email
+    - "sho_*"
+
+  solutions: []
+  exclude: []
+  output: Metadata
+  layout: perEntity
+  relationships: included
+
+generator:
+  namespace: Contoso.Model
+  serviceContextName: DataverseContext
+
+  # The publisher prefix, so that sho_duedate becomes Sho_DueDate.
+  camelCaseCustomWords: [sho]

@@ -1,0 +1,14 @@
+# Shko Online's Early Bound - Dataverse metadata
+# Written by 'earlybound pull'. Do not edit: the next pull overwrites this file.
+# To change what is generated from it, edit earlybound.yaml.
+#
+optionSets:
+  - name: sho_budgetstatus
+    displayName: Budget Status
+    description: How a budget stands.
+    type: Picklist
+    options:
+      - {value: 100000000, label: No Committed Budget}
+      - {value: 100000001, label: May Buy}
+      - {value: 100000002, label: Can Buy, description: Budget is approved.}
+      - {value: 100000003, label: Will Buy, color: '#0070F4'}

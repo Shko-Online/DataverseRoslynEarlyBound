@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- .NET 8 is kept so the tool runs on machines that only have the SDK Visual Studio 2022 installed. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <RollForward>Major</RollForward>
+    <AssemblyName>earlybound</AssemblyName>
+    <RootNamespace>ShkoOnline.EarlyBound.Tool</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>earlybound</ToolCommandName>
+    <PackageId>ShkoOnline.EarlyBound.Tool</PackageId>
+    <Title>Shko Online's Early Bound CLI</Title>
+    <Description>Downloads Dataverse table metadata into YAML files for the ShkoOnline.EarlyBound source generator. Run 'earlybound init', then 'earlybound pull'.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShkoOnline.EarlyBound.Core\ShkoOnline.EarlyBound.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="ShkoOnline.EarlyBound.Tests" />
+  </ItemGroup>
+
+</Project>

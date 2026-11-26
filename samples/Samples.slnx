@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Contoso.Console/Contoso.Console.csproj" />
+  <Project Path="Contoso.Plugins/Contoso.Plugins.csproj" />
+</Solution>

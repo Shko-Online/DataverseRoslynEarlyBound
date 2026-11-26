@@ -1,0 +1,200 @@
+# Fixture: a trimmed-down account table.
+entities:
+  - logicalName: account
+    schemaName: Account
+    displayName: Account
+    displayCollectionName: Accounts
+    description: Business that represents a customer or potential customer. The company that is billed in business transactions.
+    entitySetName: accounts
+    logicalCollectionName: accounts
+    primaryIdAttribute: accountid
+    primaryNameAttribute: name
+    primaryImageAttribute: entityimage
+    objectTypeCode: 1
+    ownershipType: UserOwned
+    attributes:
+      - logicalName: accountcategorycode
+        schemaName: AccountCategoryCode
+        type: Picklist
+        displayName: Category
+        description: Select a category to indicate whether the customer account is standard or preferred.
+        optionSet:
+          name: account_accountcategorycode
+          displayName: Category
+          type: Picklist
+          options:
+            - { value: 1, label: Preferred Customer }
+            - { value: 2, label: Standard }
+      - logicalName: accountcategorycodename
+        schemaName: AccountCategoryCodeName
+        type: Virtual
+        isValidForCreate: false
+        isValidForUpdate: false
+        attributeOf: accountcategorycode
+      - logicalName: accountid
+        schemaName: AccountId
+        type: Uniqueidentifier
+        displayName: Account
+        description: Unique identifier of the account.
+        requiredLevel: SystemRequired
+        isValidForUpdate: false
+      - logicalName: accountnumber
+        schemaName: AccountNumber
+        type: String
+        displayName: Account Number
+        description: Type an ID number or code for the account to quickly search and identify the account in system views.
+        maxLength: 20
+        format: Text
+      - logicalName: createdon
+        schemaName: CreatedOn
+        type: DateTime
+        displayName: Created On
+        description: Shows the date and time when the record was created.
+        isValidForCreate: false
+        isValidForUpdate: false
+        dateTimeBehavior: UserLocal
+      - logicalName: creditlimit
+        schemaName: CreditLimit
+        type: Money
+        displayName: Credit Limit
+        description: Type the credit limit of the account. This is a useful reference when you address invoice and accounting issues with the customer.
+        precision: 2
+      - logicalName: donotemail
+        schemaName: DoNotEMail
+        type: Boolean
+        displayName: Do not allow Emails
+      - logicalName: entityimage
+        schemaName: EntityImage
+        type: Image
+        displayName: Default Image
+      - logicalName: entityimage_url
+        schemaName: EntityImage_URL
+        type: String
+        isValidForCreate: false
+        isValidForUpdate: false
+        attributeOf: entityimageid
+      - logicalName: entityimageid
+        schemaName: EntityImageId
+        type: Uniqueidentifier
+        isValidForCreate: false
+        isValidForUpdate: false
+        attributeOf: entityimage
+      - logicalName: industrycode
+        schemaName: IndustryCode
+        type: Picklist
+        displayName: Industry
+        optionSet:
+          name: account_industrycode
+          displayName: Industry
+          type: Picklist
+          options:
+            - { value: 1, label: Accounting }
+            - { value: 2, label: "Agriculture and Non-petrol Natural Resource Extraction" }
+            - { value: 3, label: "Broadcasting Printing and Publishing" }
+            - { value: 4, label: Brokers }
+            - { value: 5, label: "Building Supply Retail" }
+            - { value: 33, label: "Wholesale" }
+      - logicalName: name
+        schemaName: Name
+        type: String
+        displayName: Account Name
+        description: Type the company or business name.
+        requiredLevel: ApplicationRequired
+        maxLength: 160
+      - logicalName: numberofemployees
+        schemaName: NumberOfEmployees
+        type: Integer
+        displayName: Number of Employees
+        minValue: "0"
+        maxValue: "1000000000"
+      - logicalName: ownerid
+        schemaName: OwnerId
+        type: Owner
+        displayName: Owner
+        requiredLevel: SystemRequired
+        targets: [systemuser, team]
+      - logicalName: parentaccountid
+        schemaName: ParentAccountId
+        type: Lookup
+        displayName: Parent Account
+        description: Choose the parent account associated with this account to show parent and child businesses in reporting and analytics.
+        targets: [account]
+      - logicalName: primarycontactid
+        schemaName: PrimaryContactId
+        type: Lookup
+        displayName: Primary Contact
+        description: Choose the primary contact for the account to provide quick access to contact details.
+        targets: [contact]
+      - logicalName: primarycontactidname
+        schemaName: PrimaryContactIdName
+        type: String
+        isValidForCreate: false
+        isValidForUpdate: false
+        attributeOf: primarycontactid
+      - logicalName: primarycontactidyominame
+        schemaName: PrimaryContactIdYomiName
+        type: String
+        isValidForCreate: false
+        isValidForUpdate: false
+        attributeOf: primarycontactid
+      - logicalName: sho_budgetstatus
+        schemaName: sho_BudgetStatus
+        type: Picklist
+        displayName: Budget Status
+        globalOptionSet: sho_budgetstatus
+      - logicalName: sho_legacycode
+        schemaName: sho_legacycode
+        type: String
+        displayName: Legacy Code (Deprecated)
+      - logicalName: sho_tags
+        schemaName: sho_Tags
+        type: MultiSelectPicklist
+        displayName: Tags
+        optionSet:
+          name: sho_account_sho_tags
+          displayName: Tags
+          type: Picklist
+          options:
+            - { value: 100000000, label: VIP }
+            - { value: 100000001, label: "Key Account" }
+            - { value: 100000002, label: "At Risk", color: "#E40046" }
+      - logicalName: statecode
+        schemaName: StateCode
+        type: State
+        displayName: Status
+        description: Shows whether the account is active or inactive.
+        requiredLevel: SystemRequired
+        isValidForCreate: false
+        optionSet:
+          name: account_statecode
+          displayName: Status
+          type: State
+          options:
+            - { value: 0, label: Active, invariantName: Active, defaultStatus: 1 }
+            - { value: 1, label: Inactive, invariantName: Inactive, defaultStatus: 2 }
+      - logicalName: statuscode
+        schemaName: StatusCode
+        type: Status
+        displayName: Status Reason
+        optionSet:
+          name: account_statuscode
+          displayName: Status Reason
+          type: Status
+          options:
+            - { value: 1, label: Active, state: 0 }
+            - { value: 2, label: Inactive, state: 1 }
+      - logicalName: versionnumber
+        schemaName: VersionNumber
+        type: BigInt
+        displayName: Version Number
+        isValidForCreate: false
+        isValidForUpdate: false
+    manyToOne:
+      - { schemaName: account_parent_account, entity: account, attribute: parentaccountid }
+      - { schemaName: account_primary_contact, entity: contact, attribute: primarycontactid }
+    oneToMany:
+      - { schemaName: account_parent_account, entity: account, attribute: parentaccountid }
+      - { schemaName: contact_customer_accounts, entity: contact, attribute: parentcustomerid }
+      - { schemaName: sho_account_sho_project, entity: sho_project, attribute: sho_accountid }
+    manyToMany:
+      - { schemaName: sho_account_contact_stakeholders, entity: contact, intersectEntity: sho_account_contact }

@@ -1,0 +1,33 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+*.binlog
+
+# NuGet
+*.nupkg
+*.snupkg
+samples/.packages/
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (release tooling)
+node_modules/
+
+# Local secrets — never commit credentials for a Dataverse environment
+.env
+.env.*
+*.local.yaml
