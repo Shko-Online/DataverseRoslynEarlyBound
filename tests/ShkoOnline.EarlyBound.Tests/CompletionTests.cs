@@ -295,6 +295,141 @@ public class CompletionTests
         Assert.Empty(result.Names);
     }
 
+    // ---- Members that are not generated yet ---------------------------------------------------------
+    //
+    // Only the members the code uses are generated, so the compiler's own completion can only show
+    // those. The provider offers the rest; picking one is what gets it generated.
+
+    [Theory]
+    [InlineData("""Account account = null; var x = account.$$;""")]
+    [InlineData("""Account account = null; var x = account.$$""")] // nothing after the dot yet
+    [InlineData("""Account account = null; var x = account.Cred$$;""")]
+    [InlineData("""Account account = null; var x = account?.$$;""")]
+    [InlineData("""var x = new Account().$$;""")]
+    [InlineData("""var x = new Entity("account").ToEntity<Account>().$$;""")]
+    [InlineData("""var x = new List<Account>().Select(row => row.$$);""")]
+    public async Task Members_not_generated_yet_are_offered_on_a_row(string statements)
+    {
+        var result = await Complete(statements);
+
+        Assert.Contains("CreditLimit", result.Names);
+        Assert.Contains("AccountCategoryCode", result.Names);
+        Assert.Contains("PrimaryContactIdName", result.Names);
+        Assert.Contains("Account_Primary_Contact", result.Names); // relationships too
+
+        // The key is always generated, so the compiler's own completion already has it.
+        Assert.DoesNotContain("AccountId", result.Names);
+        Assert.DoesNotContain("FirstName", result.Names); // a column of another table
+    }
+
+    [Fact]
+    public async Task A_member_in_use_is_left_to_the_compilers_own_completion()
+    {
+        var result = await Complete("""Account account = null; var n = account.Name; var x = account.$$;""");
+
+        Assert.DoesNotContain("Name", result.Names);
+        Assert.Contains("CreditLimit", result.Names);
+    }
+
+    [Theory]
+    [InlineData("""var a = new Account { $$ };""")]
+    [InlineData("""var a = new Account { Name = "x", $$ };""")]
+    [InlineData("""var a = new Account { Cred$$ };""")]
+    [InlineData("""var a = new Account { Cred$$ = null };""")]
+    [InlineData("""Account a = new() { $$ };""")]
+    public async Task Members_that_can_be_set_are_offered_in_an_object_initializer(string statements)
+    {
+        var result = await Complete(statements);
+
+        Assert.Contains("CreditLimit", result.Names);
+        Assert.Contains("Account_Primary_Contact", result.Names);
+        Assert.DoesNotContain("CreatedOn", result.Names); // read-only
+        Assert.DoesNotContain("PrimaryContactIdName", result.Names); // computed
+    }
+
+    [Fact]
+    public async Task What_an_initializer_already_sets_is_not_offered_again()
+    {
+        var result = await Complete("""var a = new Account { Name = "x", $$ };""");
+
+        Assert.DoesNotContain("Name", result.Names);
+        Assert.Contains("AccountNumber", result.Names);
+    }
+
+    [Theory]
+    [InlineData("""var a = new Account { $$ };""", ' ')]
+    [InlineData("""var a = new Account { C$$ };""", 'C')]
+    [InlineData("""var a = new Account { Name = "x", C$$ };""", 'C')]
+    [InlineData("""Account account = null; var x = account.$$;""", '.')]
+    public async Task Typing_where_a_member_goes_brings_them_up(string statements, char typed)
+    {
+        var result = await Complete(statements, typed);
+        Assert.Contains("CreditLimit", result.Names);
+    }
+
+    [Fact]
+    public async Task Column_name_constants_are_offered_under_fields()
+    {
+        var result = await Complete("""var column = Account.Fields.$$;""");
+
+        Assert.Contains("CreditLimit", result.Names);
+        Assert.Contains("AccountCategoryCode", result.Names);
+        Assert.DoesNotContain("Account_Primary_Contact", result.Names); // a relationship is not a column
+        Assert.DoesNotContain("AccountId", result.Names); // generated already
+        Assert.Contains(Microsoft.CodeAnalysis.Tags.WellKnownTags.Constant, result.Item("CreditLimit").Tags);
+    }
+
+    [Theory]
+    [InlineData("""Entity e = null; var x = e.$$;""")] // late bound: no generated class
+    [InlineData("""var x = "text".$$;""")]
+    [InlineData("""var x = context.$$;""")]
+    [InlineData("""var x = Account.$$;""")] // the class itself, not a row
+    [InlineData("""Account account = null; var x = account.Id.$$;""")]
+    [InlineData("""var d = new Dictionary<string, object> { $$ };""")]
+    [InlineData("""var q = new QueryExpression { $$ };""")]
+    public async Task Members_are_not_offered_where_there_is_no_generated_class(string statements)
+    {
+        var result = await Complete(statements);
+        Assert.Empty(result.Names);
+    }
+
+    [Fact]
+    public async Task Members_are_offered_on_a_class_derived_from_a_generated_one()
+    {
+        var result = await CompletionHarness.CompleteAsync(Prelude + """
+                    var x = new KeyAccount().$$;
+                }
+            }
+
+            class KeyAccount : Account { }
+            """);
+
+        Assert.Contains("CreditLimit", result.Names);
+    }
+
+    [Fact]
+    public async Task Picking_a_member_writes_its_name_and_says_what_will_happen()
+    {
+        var result = await Complete("""Account account = null; var x = account.Cred$$;""");
+
+        Assert.Contains("var x = account.CreditLimit;", await result.CommitAsync("CreditLimit"));
+        Assert.Equal("Credit Limit · Money", result.Item("CreditLimit").InlineDescription);
+        var description = await result.DescribeAsync("CreditLimit");
+        Assert.Contains("Credit Limit (Money column of Account)", description);
+        Assert.Contains("Not generated yet", description);
+        Assert.Contains("N:1 Contact", result.Item("Account_Primary_Contact").InlineDescription);
+    }
+
+    [Fact]
+    public async Task Nothing_is_offered_when_every_member_is_generated_anyway()
+    {
+        var everything = Fixtures.MetadataFilesWith(("/consumer/earlybound.yaml", Fixtures.FullConfiguration));
+        var result = await CompletionHarness.CompleteAsync(
+            Prelude + """Account account = null; var x = account.$$;""" + "\n    }\n}\n", files: everything);
+
+        Assert.Empty(result.Names);
+    }
+
     // ---- FetchXML ------------------------------------------------------------------------------
 
     private static Task<CompletionResult> Fetch(string fetchXml, string open = "@\"", string close = "\"") =>

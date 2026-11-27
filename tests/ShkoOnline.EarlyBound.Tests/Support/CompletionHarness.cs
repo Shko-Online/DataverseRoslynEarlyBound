@@ -47,7 +47,8 @@ internal static class CompletionHarness
         string source,
         char? typed = null,
         IEnumerable<(string Path, string Text)>? files = null,
-        bool withGenerator = true)
+        bool withGenerator = true,
+        MetadataReference? reference = null)
     {
         var position = source.IndexOf("$$", StringComparison.Ordinal);
         Assert.True(position >= 0, "The source needs a $$ caret marker.");
@@ -55,9 +56,11 @@ internal static class CompletionHarness
 
         // Loading the project and warming the provider up is the slow part, so cases share it
         // and only swap the text of one document, like an editor does while you type.
-        var project = files == null
-            ? await SharedProjects.GetOrAdd(withGenerator, static generator => CreateProjectAsync(null, generator))
-            : await CreateProjectAsync(files, withGenerator);
+        var project = files != null
+            ? await CreateProjectAsync(files, withGenerator, reference)
+            : reference != null
+                ? await ProjectsWithReference.GetValue(reference, static r => CreateProjectAsync(null, true, r))
+                : await SharedProjects.GetOrAdd(withGenerator, static generator => CreateProjectAsync(null, generator, null));
 
         var document = project.Solution.WithDocumentText(project.DocumentId, SourceText.From(source)).GetDocument(project.DocumentId)!;
         var trigger = typed.HasValue ? CompletionTrigger.CreateInsertionTrigger(typed.Value) : CompletionTrigger.Invoke;
@@ -72,7 +75,10 @@ internal static class CompletionHarness
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<bool, Task<LoadedProject>> SharedProjects = new();
 
-    private static async Task<LoadedProject> CreateProjectAsync(IEnumerable<(string Path, string Text)>? files, bool withGenerator)
+    // A project per referenced assembly: the test project of a given plug-in assembly.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<MetadataReference, Task<LoadedProject>> ProjectsWithReference = new();
+
+    private static async Task<LoadedProject> CreateProjectAsync(IEnumerable<(string Path, string Text)>? files, bool withGenerator, MetadataReference? reference)
     {
         // Kept alive for the lifetime of the test run when shared.
         var workspace = new AdhocWorkspace(Host.Value);
@@ -87,7 +93,7 @@ internal static class CompletionHarness
                 filePath: ProjectDirectory + "/Consumer.csproj",
                 compilationOptions: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary),
                 parseOptions: new CSharpParseOptions(LanguageVersion.Latest),
-                metadataReferences: GeneratorHarness.References()));
+                metadataReferences: reference == null ? GeneratorHarness.References() : GeneratorHarness.References().Add(reference)));
 
         var loader = new InProcessAnalyzerLoader();
         solution = solution.AddAnalyzerReference(projectId, new AnalyzerFileReference(typeof(EarlyBoundCompletionProvider).Assembly.Location, loader));

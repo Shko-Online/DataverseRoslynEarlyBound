@@ -25,5 +25,11 @@ generator:
   namespace: Contoso.Model
   serviceContextName: DataverseContext
 
+  # Only the members this project's code uses are generated (the default).
+  # Two other samples read these files. Contoso.Console does not reference this project, so it
+  # gets classes of its own with the members it uses. Contoso.Plugins.Tests does, so it uses
+  # these classes and generates what its tests need beyond them in AccountTestEntity : Account.
+  generateOnlyUsedAttributes: true
+
   # The publisher prefix, so that sho_duedate becomes Sho_DueDate.
   camelCaseCustomWords: [sho]

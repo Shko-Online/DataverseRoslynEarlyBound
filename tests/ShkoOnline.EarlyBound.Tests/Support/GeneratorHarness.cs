@@ -17,6 +17,15 @@ internal sealed record GeneratorRun(
     public IEnumerable<Diagnostic> CompilationErrors =>
         Compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
 
+    /// <summary>The compiled assembly: what another project would reference.</summary>
+    public byte[] EmitImage()
+    {
+        using var stream = new MemoryStream();
+        var result = Compilation.Emit(stream);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
+        return stream.ToArray();
+    }
+
     public string Source(string hintName) =>
         Result.GeneratedTrees.Single(t => Path.GetFileName(t.FilePath) == hintName).ToString();
 
@@ -47,11 +56,19 @@ internal static class GeneratorHarness
             || name.StartsWith("Microsoft.PowerPlatform.", StringComparison.OrdinalIgnoreCase);
     }
 
-    public static CSharpCompilation CreateCompilation(string source, LanguageVersion languageVersion = LanguageVersion.Latest, bool includeSdk = true) =>
+    public static CSharpCompilation CreateCompilation(
+        string source,
+        LanguageVersion languageVersion = LanguageVersion.Latest,
+        bool includeSdk = true,
+        IEnumerable<(string Path, string Text)>? moreSources = null,
+        string assemblyName = "Consumer",
+        IEnumerable<MetadataReference>? moreReferences = null) =>
         CSharpCompilation.Create(
-            "Consumer",
-            new[] { CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(languageVersion), path: "Consumer.cs") },
-            References(includeSdk),
+            assemblyName,
+            new[] { ("Consumer.cs", source) }
+                .Concat(moreSources ?? Array.Empty<(string, string)>())
+                .Select(file => CSharpSyntaxTree.ParseText(file.Item2, new CSharpParseOptions(languageVersion), path: file.Item1)),
+            References(includeSdk).AddRange(moreReferences ?? Array.Empty<MetadataReference>()),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Disable));
 
     public static GeneratorRun Run(
@@ -60,9 +77,12 @@ internal static class GeneratorHarness
         LanguageVersion languageVersion = LanguageVersion.Latest,
         bool includeSdk = true,
         IReadOnlyDictionary<string, string>? buildProperties = null,
-        bool tagFiles = true)
+        bool tagFiles = true,
+        IEnumerable<(string Path, string Text)>? moreSources = null,
+        string assemblyName = "Consumer",
+        IEnumerable<MetadataReference>? moreReferences = null)
     {
-        var compilation = CreateCompilation(userSource, languageVersion, includeSdk);
+        var compilation = CreateCompilation(userSource, languageVersion, includeSdk, moreSources, assemblyName, moreReferences);
         var texts = files.Select(f => (AdditionalText)new InMemoryAdditionalText(f.Path, f.Text)).ToImmutableArray();
         var options = new TestOptionsProvider(buildProperties, tagFiles);
 

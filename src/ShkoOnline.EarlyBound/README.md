@@ -36,7 +36,11 @@ The project also needs the Dataverse SDK: `Microsoft.CrmSdk.CoreAssemblies` for 
 
 - A class per table and an enum per choice, named and shaped like the output of the Early Bound
   Generator for XrmToolBox, so existing code keeps compiling.
-- Constants for every name: `Account.EntityLogicalName`, `Account.Fields.Name`.
+- Only what you use: members are generated for the columns your code mentions, not for all
+  few hundred of a table, and IntelliSense still offers the rest.
+- Test projects get what the plug-ins do not use in derived classes, `AccountTestEntity :
+  Account`, generated in the test project when a test names them.
+- Constants for names: `Account.EntityLogicalName`, `Account.Fields.Name`.
 - Relationship properties and a LINQ service context.
 - Code that compiles as C# 7.3, for .NET Framework plug-in projects.
 - Autocomplete for table and column names in SDK calls (`new Entity("`, `entity["`,

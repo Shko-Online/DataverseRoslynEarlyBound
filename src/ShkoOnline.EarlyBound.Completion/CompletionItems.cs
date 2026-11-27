@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Tags;
 using ShkoOnline.EarlyBound.Metadata;
+using ShkoOnline.EarlyBound.Model;
 
 namespace ShkoOnline.EarlyBound.Completion;
 
@@ -29,6 +30,10 @@ internal static class CompletionItems
     private static readonly ImmutableArray<string> RelationshipTags = ImmutableArray.Create(WellKnownTags.Reference);
     private static readonly ImmutableArray<string> OptionTags = ImmutableArray.Create(WellKnownTags.EnumMember, WellKnownTags.Public);
     private static readonly ImmutableArray<string> KeywordTags = ImmutableArray.Create(WellKnownTags.Keyword);
+    private static readonly ImmutableArray<string> PropertyTags = ImmutableArray.Create(WellKnownTags.Property, WellKnownTags.Public);
+    private static readonly ImmutableArray<string> ConstantTags = ImmutableArray.Create(WellKnownTags.Constant, WellKnownTags.Public);
+
+    private const string GeneratedOnUse = "Not generated yet: it is added to the class as soon as the code uses it.";
 
     public static IEnumerable<CompletionItem> Entities(MetadataSet metadata)
     {
@@ -161,6 +166,66 @@ internal static class CompletionItems
                 inlineDescription: attributeLogicalName,
                 isComplexTextEdit: true);
             index++;
+        }
+    }
+
+    /// <summary>
+    /// Members of a generated class that exist in the metadata but have not been generated,
+    /// because nothing uses them yet. They sort among the members that do exist.
+    /// </summary>
+    public static IEnumerable<CompletionItem> Members(MemberRequest request)
+    {
+        var table = request.Entity.Definition.DisplayName ?? request.Entity.Definition.LogicalName;
+        var tags = request.Kind == MemberContextKind.Fields ? ConstantTags : PropertyTags;
+        foreach (var attribute in request.Attributes)
+        {
+            var name = attribute.PropertyName.TrimStart('@');
+            var description = Describe(attribute.Definition, table) + "\n" + GeneratedOnUse;
+            yield return Create(name, InlineDescription(attribute.Definition), description, tags);
+        }
+
+        foreach (var relationship in request.Relationships)
+        {
+            var shape = relationship.Kind switch
+            {
+                RelationshipKind.ManyToOne => "N:1",
+                RelationshipKind.OneToMany => "1:N",
+                _ => "N:N",
+            };
+            var related = relationship.Related.Definition.DisplayName ?? relationship.Related.Definition.LogicalName;
+            var description = $"{relationship.Definition.SchemaName} ({shape} relationship of {table} with {related})\n{GeneratedOnUse}";
+            yield return Create(relationship.PropertyName.TrimStart('@'), shape + " " + related, description, PropertyTags);
+        }
+    }
+
+    /// <summary>
+    /// Classes derived from a referenced table class, offered after <c>new</c> before they exist:
+    /// naming one is what gets it generated.
+    /// </summary>
+    public static IEnumerable<CompletionItem> TestEntities(IEnumerable<TestEntityCandidate> candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            var baseName = candidate.Entity.ClassName.TrimStart('@');
+            var description =
+                $"{candidate.ClassName} : {baseName}\n"
+                + $"{baseName} with the members that {candidate.BaseAssembly} does not generate, because nothing there uses them.\n"
+                + "Not generated yet: it is added to this project as soon as the code names it, with a member for each one used here that the base class lacks.";
+            var properties = ImmutableDictionary<string, string>.Empty.Add(DescriptionKey, description);
+            if (candidate.Insertion != candidate.ClassName)
+            {
+                properties = properties.Add(InsertionKey, candidate.Insertion);
+            }
+
+            yield return CompletionItem.Create(
+                displayText: candidate.ClassName,
+                filterText: candidate.ClassName,
+                sortText: candidate.ClassName,
+                properties: properties,
+                tags: EntityTags,
+                rules: CompletionItemRules.Default,
+                inlineDescription: baseName + " + its other members",
+                isComplexTextEdit: candidate.Insertion != candidate.ClassName);
         }
     }
 

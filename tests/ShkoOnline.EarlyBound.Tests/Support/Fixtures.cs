@@ -15,10 +15,16 @@ internal static class Fixtures
     public static IReadOnlyList<(string Path, string Text)> MetadataFilesWith(params (string Path, string Text)[] extra) =>
         MetadataFiles().Concat(extra).ToList();
 
-    /// <summary>A configuration file that makes the publisher prefix a known word.</summary>
+    /// <summary>
+    /// A configuration file that makes the publisher prefix a known word. With the defaults, so
+    /// only the members the code uses are generated.
+    /// </summary>
     public const string Configuration = """
         generator:
           namespace: Contoso.Model
           camelCaseCustomWords: [sho]
         """;
+
+    /// <summary>The same, generating every member whether it is used or not.</summary>
+    public const string FullConfiguration = Configuration + "\n  generateOnlyUsedAttributes: false\n";
 }

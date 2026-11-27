@@ -23,23 +23,41 @@ namespace Contoso.Plugins
             var service = factory.CreateOrganizationService(context.UserId);
 
             // Early bound: the Target as a typed class.
-            var project = ((Entity)context.InputParameters["Target"]).ToEntity<Sho_Project>();
+            var target = (Entity)context.InputParameters["Target"];
+            var project = target.ToEntity<Sho_Project>();
+
+            // Constants instead of strings.
+            Account customer = null;
+            if (project.Sho_AccountId != null)
+            {
+                customer = service
+                    .Retrieve(Account.EntityLogicalName, project.Sho_AccountId.Id, new ColumnSet(Account.Fields.Name, Account.Fields.Sho_BudgetStatus))
+                    .ToEntity<Account>();
+            }
+
+            ApplyDefaults(project, customer, DateTime.UtcNow.Date);
+
+            // Hand the result to the pipeline as plain attributes.
+            target[Sho_Project.Fields.Sho_DueDate] = project.Sho_DueDate;
+            if (project.StatusCode != null)
+            {
+                target[Sho_Project.Fields.StatusCode] = new OptionSetValue((int)project.StatusCode.Value);
+            }
+        }
+
+        /// <summary>
+        /// The rule itself, apart from the pipeline so that it can be tested with plain objects:
+        /// see Contoso.Plugins.Tests.
+        /// </summary>
+        public static void ApplyDefaults(Sho_Project project, Account customer, DateTime today)
+        {
             if (project.Sho_DueDate == null)
             {
-                project.Sho_DueDate = DateTime.UtcNow.Date.AddDays(30);
+                project.Sho_DueDate = today.AddDays(30);
             }
 
-            if (project.Sho_AccountId == null)
-            {
-                return;
-            }
-
-            // Constants instead of strings, and an enum instead of a magic number.
-            var customer = service
-                .Retrieve(Account.EntityLogicalName, project.Sho_AccountId.Id, new ColumnSet(Account.Fields.Name, Account.Fields.Sho_BudgetStatus))
-                .ToEntity<Account>();
-
-            if (customer.Sho_BudgetStatus == Sho_BudgetStatus.NoCommittedBudget)
+            // An enum instead of a magic number.
+            if (customer != null && customer.Sho_BudgetStatus == Sho_BudgetStatus.NoCommittedBudget)
             {
                 project.StatusCode = Sho_Project_StatusCode.OnHold_Active;
             }

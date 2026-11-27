@@ -477,6 +477,7 @@ public class ProjectConfigurationTests
         Assert.Null(configuration.Pull.LanguageCode);
         Assert.Equal("Contoso.Model", configuration.Generator.Namespace);
         Assert.Equal("DataverseContext", configuration.Generator.ServiceContextName);
+        Assert.True(configuration.Generator.GenerateOnlyUsedAttributes);
     }
 
     [Fact]

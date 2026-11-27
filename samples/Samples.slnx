@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="Contoso.Console/Contoso.Console.csproj" />
+  <Project Path="Contoso.Plugins.Tests/Contoso.Plugins.Tests.csproj" />
   <Project Path="Contoso.Plugins/Contoso.Plugins.csproj" />
 </Solution>

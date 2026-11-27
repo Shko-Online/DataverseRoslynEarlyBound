@@ -40,9 +40,16 @@ jobs:
         run: dotnet pack ShkoOnline.EarlyBound.slnx -c Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=0.0.1-ci
 
       # The samples consume the packages just built, the way a user's project would:
-      # a .NET Framework plug-in project (C# 7.3) and a modern .NET app.
+      # a .NET Framework plug-in project (C# 7.3), its test project and a modern .NET app.
       - name: Build the samples against the packages
         run: dotnet build samples/Samples.slnx -p:EarlyBoundVersion=0.0.1-ci
+
+      # The plug-in tests target .NET Framework, which only Windows can run. They are run from
+      # the samples folder, whose global.json does not select the repository's test runner.
+      - name: Run the sample tests
+        if: runner.os == 'Windows'
+        working-directory: samples
+        run: dotnet test Contoso.Plugins.Tests/Contoso.Plugins.Tests.csproj --no-build -p:EarlyBoundVersion=0.0.1-ci
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.os == 'ubuntu-latest'

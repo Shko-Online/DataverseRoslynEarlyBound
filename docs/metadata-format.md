@@ -97,7 +97,8 @@ entities:
 
 The names are Dataverse's `AttributeTypeName` values without the `Type` suffix.
 
-A column gets a property when it is valid for create, update or read. A column with `attributeOf`
+A column can have a property when it is valid for create, update or read; by default it gets
+one once the project's code uses it (see [Only used members](configuration.md#only-used-members)). A column with `attributeOf`
 gets one only when it is an image, ends in `_url` or `_timestamp`, or is the `…name` companion of
 a lookup or choice; that companion returns the display text from `FormattedValues` and is
 read-only. A column that is valid for neither create nor update gets no setter.
@@ -160,7 +161,7 @@ The order of the options is their display order in Dataverse and becomes `Displa
       - {schemaName: accountleads_association, entity: lead, intersectEntity: accountleads}
 ```
 
-`entity` is the table on the other side, `attribute` the lookup column. A relationship produces
+`entity` is the table on the other side, `attribute` the lookup column. A relationship can have
 a property only when the table on the other side is among the tables too. A relationship from a
 table to itself appears under both `manyToOne` and `oneToMany` and produces `Referencing…` and
 `Referenced…` properties.
