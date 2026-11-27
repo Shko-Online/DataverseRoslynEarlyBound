@@ -7,6 +7,8 @@
     By default these are earlybound.yaml next to the project file, and every YAML file in the
     Metadata folder. To change that, set in the project file:
 
+      <EarlyBoundMetadataRoot>..\Contoso.Plugins</EarlyBoundMetadataRoot>   use another project's earlybound.yaml and metadata
+                                                                            (a test project using its plug-in project's)
       <EarlyBoundMetadataPath>Dataverse</EarlyBoundMetadataPath>    another folder (the "pull.output" of earlybound.yaml)
       <EnableDefaultEarlyBoundItems>false</EnableDefaultEarlyBoundItems>   no defaults at all
 
@@ -15,16 +17,23 @@
       <EarlyBoundMetadata Include="..\Shared\Metadata\**\*.yaml" />
 
     <EarlyBoundNamespace>Contoso.Model</EarlyBoundNamespace> overrides the namespace of the generated code.
+
+    <EarlyBoundGenerateOnlyUsedAttributes>false</EarlyBoundGenerateOnlyUsedAttributes> generates every
+    column and relationship instead of only those the project's code uses. Needed when other
+    projects use the generated classes, since their code is not seen from here.
   -->
   <PropertyGroup>
     <EarlyBoundMetadataPath Condition="'$(EarlyBoundMetadataPath)' == ''">Metadata</EarlyBoundMetadataPath>
+    <EarlyBoundMetadataRoot Condition="'$(EarlyBoundMetadataRoot)' == ''">$(MSBuildProjectDirectory)</EarlyBoundMetadataRoot>
     <EnableDefaultEarlyBoundItems Condition="'$(EnableDefaultEarlyBoundItems)' == ''">true</EnableDefaultEarlyBoundItems>
+    <_EarlyBoundMetadataRoot>$([System.IO.Path]::GetFullPath('$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(EarlyBoundMetadataRoot)'))'))</_EarlyBoundMetadataRoot>
+    <_EarlyBoundMetadataFolder>$([System.IO.Path]::Combine('$(_EarlyBoundMetadataRoot)', '$(EarlyBoundMetadataPath)'))</_EarlyBoundMetadataFolder>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(EnableDefaultEarlyBoundItems)' == 'true'">
-    <EarlyBoundMetadata Include="$(MSBuildProjectDirectory)\earlybound.yaml" Condition="Exists('$(MSBuildProjectDirectory)\earlybound.yaml')" />
-    <EarlyBoundMetadata Include="$(MSBuildProjectDirectory)\earlybound.yml" Condition="Exists('$(MSBuildProjectDirectory)\earlybound.yml')" />
-    <EarlyBoundMetadata Include="$(EarlyBoundMetadataPath)\**\*.yaml;$(EarlyBoundMetadataPath)\**\*.yml" />
+    <EarlyBoundMetadata Include="$(_EarlyBoundMetadataRoot)\earlybound.yaml" Condition="Exists('$(_EarlyBoundMetadataRoot)\earlybound.yaml')" />
+    <EarlyBoundMetadata Include="$(_EarlyBoundMetadataRoot)\earlybound.yml" Condition="Exists('$(_EarlyBoundMetadataRoot)\earlybound.yml')" />
+    <EarlyBoundMetadata Include="$(_EarlyBoundMetadataFolder)\**\*.yaml;$(_EarlyBoundMetadataFolder)\**\*.yml" />
   </ItemGroup>
 
   <ItemGroup>

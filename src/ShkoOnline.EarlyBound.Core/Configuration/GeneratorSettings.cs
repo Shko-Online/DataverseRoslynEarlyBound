@@ -15,6 +15,18 @@ public sealed class GeneratorSettings
 
     public bool GenerateTypesAsInternal { get; set; }
 
+    /// <summary>
+    /// Generate members only for the columns and relationships the project's own code uses,
+    /// instead of for everything in the metadata.
+    /// </summary>
+    public bool GenerateOnlyUsedAttributes { get; set; } = true;
+
+    /// <summary>
+    /// Members generated whether they are used or not, as <c>table.column</c> or
+    /// <c>table.relationship</c> with <c>*</c> as a wildcard. A table name alone means all of its members.
+    /// </summary>
+    public List<string> AlwaysGenerate { get; set; } = new();
+
     // ---- Naming -------------------------------------------------------------------------
 
     public bool CamelCaseClassNames { get; set; } = true;

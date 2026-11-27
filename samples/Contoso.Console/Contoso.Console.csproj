@@ -6,8 +6,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Contoso.Console</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- No metadata of its own: the files come from the plug-in project below. -->
-    <EnableDefaultEarlyBoundItems>false</EnableDefaultEarlyBoundItems>
+    <!-- No metadata of its own: earlybound.yaml and the Metadata folder of the plug-in project are used. -->
+    <EarlyBoundMetadataRoot>..\Contoso.Plugins</EarlyBoundMetadataRoot>
     <!-- The Dataverse client still references packages with published advisories. Pin patched versions in real projects. -->
     <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
@@ -15,11 +15,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.2.27" />
     <PackageReference Include="ShkoOnline.EarlyBound" Version="$(EarlyBoundVersion)" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EarlyBoundMetadata Include="..\Contoso.Plugins\earlybound.yaml" />
-    <EarlyBoundMetadata Include="..\Contoso.Plugins\Metadata\**\*.yaml" />
   </ItemGroup>
 
 </Project>

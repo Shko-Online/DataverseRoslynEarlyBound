@@ -62,6 +62,40 @@ Your own helper methods take part when they work with SDK types and name their p
 `entityName`, `entityLogicalName`, `tableName`, `attributeName`, `attributeLogicalName`,
 `columnName` or `fieldName`.
 
+## Members that are not generated yet
+
+By default only the members your code uses are generated, so the compiler's own completion
+knows only those. The provider adds the rest of the table to the same list:
+
+```csharp
+account.…                    // every column and relationship of the table
+new Account { … }            // those that can be set, minus the ones already set
+Account.Fields.…             // the column name constants
+```
+
+The entries carry the display name and type like everything else, and say that they are not
+generated yet. Picking one writes its name, and with the name in the code the generator adds
+the member. This works on a variable of a generated class, on the result of `ToEntity<Account>()`,
+on a lambda parameter, and on your own classes that derive from a generated one.
+
+Nothing is added on a late-bound `Entity`, or when `generateOnlyUsedAttributes` is `false`,
+because then every member exists already.
+
+### In a test project
+
+There the table classes come from the plug-in project, and cannot grow. What they lack is
+generated in [test entities](configuration.md#test-projects), and autocomplete follows:
+
+```csharp
+new …                              // AccountTestEntity and the others that do not exist yet
+new AccountTestEntity { … }        // the members Account lacks, next to the ones it has
+testAccount.…
+AccountTestEntity.Fields.…
+```
+
+Nothing is offered on the plug-in project's own `Account`: a member picked there could not be
+generated.
+
 ## Relationship names
 
 ```csharp
@@ -98,8 +132,9 @@ if (entity.GetAttributeValue<OptionSetValue>("statuscode").Value == …)
 
 The list shows the labels with their numbers, in Dataverse's order, above the ordinary entries.
 Typing a label or a number filters it. Picking an option inserts
-`(int)Account_StatusCode.Inactive` when the generated enum is available in the project, with its
-namespace when that is not imported, and `2` otherwise. In FetchXML it inserts the number.
+`(int)Account_StatusCode.Inactive`, with its namespace when that is not imported, and the enum
+is generated if it was not already. Without the generator's classes in the project it inserts
+`2`. In FetchXML it inserts the number.
 
 Options are offered only when the column is known to be a choice. When the table is unknown,
 they are offered if every table that has the column uses the same choice.

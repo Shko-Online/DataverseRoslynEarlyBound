@@ -31,6 +31,15 @@ public sealed class EmitOptions
 
     /// <summary>Version written into GeneratedCodeAttribute when that attribute is enabled.</summary>
     public string ToolVersion { get; set; } = "1.0.0";
+
+    /// <summary>
+    /// The member names the project's code uses; only those are generated. Null to generate
+    /// every member, used or not.
+    /// </summary>
+    public ICollection<string>? UsedNames { get; set; }
+
+    /// <summary>The generated types the project already gets from its references.</summary>
+    public ReferencedTypes Referenced { get; set; } = ReferencedTypes.None;
 }
 
 /// <summary>
@@ -52,20 +61,30 @@ public static class CSharpEmitter
             return sources;
         }
 
-        sources.Add(new GeneratedSource("EarlyBound.Helpers.g.cs", EmitHelpers(model, options)));
-
-        foreach (var entity in model.Entities)
+        var plan = GenerationPlan.Create(model, options.UsedNames, options.Referenced);
+        var helpers = EmitHelpers(model, options, plan);
+        if (helpers != null)
         {
-            sources.Add(new GeneratedSource("Entities." + FileName(entity.ClassName) + ".g.cs", EmitEntity(model, entity, options)));
+            sources.Add(new GeneratedSource("EarlyBound.Helpers.g.cs", helpers));
         }
 
-        foreach (var optionSet in model.OptionSets)
+        foreach (var entity in plan.Entities)
+        {
+            sources.Add(new GeneratedSource("Entities." + FileName(entity.Entity.ClassName) + ".g.cs", EmitEntity(model, entity, options)));
+        }
+
+        foreach (var testEntity in plan.TestEntities)
+        {
+            sources.Add(new GeneratedSource("TestEntities." + testEntity.ClassName + ".g.cs", EmitTestEntity(model, testEntity, options)));
+        }
+
+        foreach (var optionSet in plan.OptionSets)
         {
             sources.Add(new GeneratedSource("OptionSets." + FileName(optionSet.EnumName) + ".g.cs", EmitOptionSet(model, optionSet, options)));
         }
 
         var contextName = model.Settings.ServiceContextName?.Trim();
-        if (!string.IsNullOrEmpty(contextName) && options.HasOrganizationServiceContext && model.Entities.Count > 0)
+        if (plan.IncludesServiceContext && options.HasOrganizationServiceContext && model.Entities.Count > 0)
         {
             sources.Add(new GeneratedSource("EarlyBound.ServiceContext.g.cs", EmitServiceContext(model, contextName!, options)));
         }
@@ -114,10 +133,12 @@ public static class CSharpEmitter
 
     // ---- Tables ---------------------------------------------------------------------------
 
-    private static string EmitEntity(EarlyBoundModel model, EntityModel entity, EmitOptions options)
+    private static string EmitEntity(EarlyBoundModel model, EntityPlan plan, EmitOptions options)
     {
         var settings = model.Settings;
+        var entity = plan.Entity;
         var definition = entity.Definition;
+        var attributes = plan.Attributes;
         var w = Begin(model);
         w.Line("namespace " + model.Namespace);
         w.Open();
@@ -131,25 +152,25 @@ public static class CSharpEmitter
 
         if (settings.GenerateAttributeNameConsts)
         {
-            EmitFields(w, entity, settings);
+            EmitFields(w, entity, attributes, settings);
         }
 
         EmitConstructors(w, entity, settings);
         EmitConstants(w, entity, settings);
 
-        foreach (var attribute in entity.Attributes)
+        foreach (var attribute in attributes)
         {
             EmitAttribute(w, entity, attribute, settings);
         }
 
-        foreach (var relationship in entity.Relationships)
+        foreach (var relationship in plan.Relationships)
         {
             EmitRelationship(w, relationship, settings);
         }
 
         if (settings.GenerateAnonymousTypeConstructor)
         {
-            EmitAnonymousTypeConstructor(w, entity, settings);
+            EmitAnonymousTypeConstructor(w, entity.ClassName, entity.Definition.PrimaryIdAttribute, settings);
         }
 
         w.Close();
@@ -157,14 +178,150 @@ public static class CSharpEmitter
         return w.ToString();
     }
 
-    private static void EmitFields(CodeWriter w, EntityModel entity, GeneratorSettings settings)
+    /// <summary>
+    /// A class derived from a table class that a referenced assembly provides. Members cannot be
+    /// added to a class from outside its assembly, so the ones it lacks are declared here instead.
+    /// An instance is still an instance of the base class, and can go wherever that is expected.
+    /// </summary>
+    private static string EmitTestEntity(EarlyBoundModel model, TestEntityPlan plan, EmitOptions options)
+    {
+        var settings = model.Settings;
+        var entity = plan.Entity;
+        var baseName = entity.ClassName;
+        var name = plan.ClassName;
+        var w = Begin(model);
+        w.Line("namespace " + model.Namespace);
+        w.Open();
+
+        w.Summary(
+            $"<see cref=\"{baseName.TrimStart('@')}\"/> with the members that {CodeWriter.EscapeXml(plan.Base.AssemblyName)} does not generate, because nothing there uses them.\n"
+            + "Generated because this project names it. It gets a member for every column and relationship this project uses that the base class lacks.",
+            raw: true);
+        w.Line("[System.Runtime.Serialization.DataContractAttribute()]");
+        w.Line($"[Microsoft.Xrm.Sdk.Client.EntityLogicalNameAttribute({CodeWriter.Literal(entity.Definition.LogicalName)})]");
+        GeneratedCode(w, settings, options);
+        w.Line($"{(plan.Base.IsPublic ? Visibility(settings) : "internal")} partial class {name} : {baseName}");
+        w.Open();
+
+        if (settings.GenerateAttributeNameConsts)
+        {
+            // The constants of the base class stay reachable through this one, which adds the rest.
+            w.Line();
+            w.Summary($"Available fields, at the time of codegen, for the {entity.Definition.LogicalName} entity");
+            w.Line(plan.Base.HasFieldsClass
+                ? $"public new partial class {settings.AttributeConstsClassName} : {baseName}.{settings.AttributeConstsClassName}"
+                : $"public partial class {settings.AttributeConstsClassName}");
+            w.Open();
+            foreach (var attribute in plan.Fields)
+            {
+                w.Line($"public const string {attribute.PropertyName} = {CodeWriter.Literal(attribute.Definition.LogicalName)};");
+            }
+
+            w.Close();
+        }
+
+        // Constructors hand over to the base class where it has the same one, so that an object
+        // built through either class starts out the same.
+        w.Line();
+        w.Summary("Default Constructor.");
+        NonUserCode(w, settings);
+        w.Line($"public {name}()");
+        w.Open().Close();
+
+        if (settings.GenerateConstructorsSansLogicalName)
+        {
+            w.Line();
+            NonUserCode(w, settings);
+            if (plan.Base.HasIdConstructor)
+            {
+                w.Line($"public {name}(System.Guid id) : ");
+                w.Line("\t\tbase(id)");
+                w.Open().Close();
+            }
+            else
+            {
+                w.Line($"public {name}(System.Guid id)");
+                w.Open();
+                w.Line("this.Id = id;");
+                w.Close();
+            }
+
+            w.Line();
+            NonUserCode(w, settings);
+            if (plan.Base.HasKeyConstructor)
+            {
+                w.Line($"public {name}(string keyName, object keyValue) : ");
+                w.Line("\t\tbase(keyName, keyValue)");
+                w.Open().Close();
+            }
+            else
+            {
+                w.Line($"public {name}(string keyName, object keyValue)");
+                w.Open();
+                w.Line("this.KeyAttributes.Add(keyName, keyValue);");
+                w.Close();
+            }
+
+            w.Line();
+            NonUserCode(w, settings);
+            if (plan.Base.HasKeyCollectionConstructor)
+            {
+                w.Line($"public {name}(Microsoft.Xrm.Sdk.KeyAttributeCollection keyAttributes) : ");
+                w.Line("\t\tbase(keyAttributes)");
+                w.Open().Close();
+            }
+            else
+            {
+                w.Line($"public {name}(Microsoft.Xrm.Sdk.KeyAttributeCollection keyAttributes)");
+                w.Open();
+                w.Line("this.KeyAttributes = keyAttributes;");
+                w.Close();
+            }
+        }
+
+        foreach (var attribute in plan.Attributes)
+        {
+            EmitAttribute(w, entity, attribute, settings);
+        }
+
+        foreach (var relationship in plan.Relationships)
+        {
+            EmitRelationship(w, relationship, settings);
+        }
+
+        if (settings.GenerateAnonymousTypeConstructor)
+        {
+            if (plan.Base.HasAnonymousTypeConstructor)
+            {
+                w.Line();
+                w.Line("/// <summary>");
+                w.Line("/// Constructor for populating via LINQ queries given a LINQ anonymous type");
+                w.Line("/// <param name=\"anonymousType\">LINQ anonymous type.</param>");
+                w.Line("/// </summary>");
+                NonUserCode(w, settings);
+                w.Line($"public {name}(object anonymousType) : ");
+                w.Line("\t\tbase(anonymousType)");
+                w.Open().Close();
+            }
+            else
+            {
+                EmitAnonymousTypeConstructor(w, name, entity.Definition.PrimaryIdAttribute, settings);
+            }
+        }
+
+        w.Close();
+        w.Close();
+        return w.ToString();
+    }
+
+    private static void EmitFields(CodeWriter w, EntityModel entity, List<AttributeModel> attributes, GeneratorSettings settings)
     {
         w.Line();
         w.Summary($"Available fields, at the time of codegen, for the {entity.Definition.LogicalName} entity");
         w.Line($"public partial class {settings.AttributeConstsClassName}");
         w.Open();
         var hasId = false;
-        foreach (var attribute in entity.Attributes)
+        foreach (var attribute in attributes)
         {
             w.Line($"public const string {attribute.PropertyName} = {CodeWriter.Literal(attribute.Definition.LogicalName)};");
             if (attribute.Kind == AttributeKind.PrimaryId)
@@ -423,9 +580,8 @@ public static class CSharpEmitter
         w.Close();
     }
 
-    private static void EmitAnonymousTypeConstructor(CodeWriter w, EntityModel entity, GeneratorSettings settings)
+    private static void EmitAnonymousTypeConstructor(CodeWriter w, string className, string? primaryId, GeneratorSettings settings)
     {
-        var primaryId = entity.Definition.PrimaryIdAttribute;
 
         w.Line();
         w.Line("/// <summary>");
@@ -433,7 +589,7 @@ public static class CSharpEmitter
         w.Line("/// <param name=\"anonymousType\">LINQ anonymous type.</param>");
         w.Line("/// </summary>");
         NonUserCode(w, settings);
-        w.Line($"public {entity.ClassName}(object anonymousType) : ");
+        w.Line($"public {className}(object anonymousType) : ");
         w.Line("\t\tthis()");
         w.Open();
         w.Line("foreach (var p in anonymousType.GetType().GetProperties())");
@@ -543,24 +699,58 @@ public static class CSharpEmitter
 
     // ---- Helpers ----------------------------------------------------------------------------
 
-    private static string EmitHelpers(EarlyBoundModel model, EmitOptions options)
+    /// <summary>The assembly attribute and the helper types. Null when none of them is needed.</summary>
+    private static string? EmitHelpers(EarlyBoundModel model, EmitOptions options, GenerationPlan selection)
     {
         var settings = model.Settings;
         var visibility = Visibility(settings);
-        var w = Begin(model);
 
-        if (settings.GenerateProxyTypesAssemblyAttribute && options.EmitProxyTypesAssemblyAttribute && model.Entities.Count > 0)
+        // An assembly that only derives from another assembly's classes is not where the proxy types are.
+        var proxyTypes = settings.GenerateProxyTypesAssemblyAttribute && options.EmitProxyTypesAssemblyAttribute && selection.Entities.Count > 0;
+        if (!proxyTypes && !selection.NeedsOptionSetEnumHelper && !selection.IncludesOptionSetMetadata)
+        {
+            return null;
+        }
+
+        var w = Begin(model);
+        if (proxyTypes)
         {
             w.Line("[assembly: Microsoft.Xrm.Sdk.Client.ProxyTypesAssemblyAttribute()]");
             w.Line();
         }
 
+        if (!selection.NeedsOptionSetEnumHelper && !selection.IncludesOptionSetMetadata)
+        {
+            return w.ToString();
+        }
+
         w.Line("namespace " + model.Namespace);
         w.Open();
 
+        if (selection.NeedsOptionSetEnumHelper)
+        {
+            EmitOptionSetEnumHelper(w, settings, options);
+        }
+
+        if (selection.IncludesOptionSetMetadata)
+        {
+            if (selection.NeedsOptionSetEnumHelper)
+            {
+                w.Line();
+            }
+
+            EmitOptionSetMetadata(w, settings, options, visibility);
+        }
+
+        w.Close();
+        return w.ToString();
+    }
+
+    private static void EmitOptionSetEnumHelper(CodeWriter w, GeneratorSettings settings, EmitOptions options)
+    {
         w.Summary("Reads and writes choice columns as the generated enums.");
         GeneratedCode(w, settings, options);
-        w.Line($"internal sealed class {EarlyBoundModelBuilder.OptionSetEnumHelperName}");
+        w.Line($"internal sealed partial class {EarlyBoundModelBuilder.OptionSetEnumHelperName}");
         w.Open();
         NonUserCode(w, settings);
         w.Line("public static System.Nullable<int> GetEnum(Microsoft.Xrm.Sdk.Entity entity, string attributeLogicalName)");
@@ -601,73 +791,69 @@ public static class CSharpEmitter
         w.Line("return collection;");
         w.Close();
         w.Close();
+    }
 
-        if (settings.GenerateOptionSetMetadataAttribute && model.OptionSets.Count > 0)
-        {
-            w.Line();
-            w.Summary("Attribute to handle storing the OptionSet's Metadata.");
-            w.Line("[System.AttributeUsageAttribute(System.AttributeTargets.Field)]");
-            GeneratedCode(w, settings, options);
-            w.Line($"{visibility} sealed class {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} : System.Attribute");
-            w.Open();
-            w.Summary("Color of the OptionSetValue.");
-            w.Line("public string Color { get; set; }");
-            w.Line();
-            w.Summary("Description of the OptionSetValue.");
-            w.Line("public string Description { get; set; }");
-            w.Line();
-            w.Summary("Display order index of the OptionSetValue.");
-            w.Line("public int DisplayIndex { get; set; }");
-            w.Line();
-            w.Summary("External value of the OptionSetValue.");
-            w.Line("public string ExternalValue { get; set; }");
-            w.Line();
-            w.Summary("Name of the OptionSetValue.");
-            w.Line("public string Name { get; set; }");
-            w.Line();
-            w.Summary($"Initializes a new instance of the {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} class.");
-            NonUserCode(w, settings);
-            w.Line($"public {EarlyBoundModelBuilder.OptionSetMetadataAttributeName}(string name, int displayIndex, string color = null, string description = null, string externalValue = null)");
-            w.Open();
-            w.Line("this.Color = color;");
-            w.Line("this.Description = description;");
-            w.Line("this.ExternalValue = externalValue;");
-            w.Line("this.DisplayIndex = displayIndex;");
-            w.Line("this.Name = name;");
-            w.Close();
-            w.Close();
-
-            w.Line();
-            w.Summary("Extension class to handle retrieving of OptionSetMetadataAttribute.");
-            GeneratedCode(w, settings, options);
-            w.Line($"{visibility} static class {EarlyBoundModelBuilder.OptionSetExtensionName}");
-            w.Open();
-            w.Summary("Returns the OptionSetMetadataAttribute for the given enum value");
-            NonUserCode(w, settings);
-            w.Line($"public static {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} GetMetadata<T>(this T value)");
-            w.Line("\twhere T : struct, System.IConvertible");
-            w.Open();
-            w.Line("System.Type enumType = typeof(T);");
-            w.Line("if (!enumType.IsEnum)");
-            w.Open();
-            w.Line("throw new System.ArgumentException(\"T must be an enum!\");");
-            w.Close();
-            w.Line("System.Reflection.MemberInfo[] members = enumType.GetMember(value.ToString());");
-            w.Line("for (int i = 0; (i < members.Length); i++)");
-            w.Open();
-            w.Line($"object[] attributes = members[i].GetCustomAttributes(typeof({EarlyBoundModelBuilder.OptionSetMetadataAttributeName}), false);");
-            w.Line("if (attributes.Length > 0)");
-            w.Open();
-            w.Line($"return (({EarlyBoundModelBuilder.OptionSetMetadataAttributeName})(attributes[0]));");
-            w.Close();
-            w.Close();
-            w.Line("throw new System.ArgumentException(\"T must be an enum adorned with an OptionSetMetadataAttribute!\");");
-            w.Close();
-            w.Close();
-        }
-
+    private static void EmitOptionSetMetadata(CodeWriter w, GeneratorSettings settings, EmitOptions options, string visibility)
+    {
+        w.Summary("Attribute to handle storing the OptionSet's Metadata.");
+        w.Line("[System.AttributeUsageAttribute(System.AttributeTargets.Field)]");
+        GeneratedCode(w, settings, options);
+        w.Line($"{visibility} sealed partial class {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} : System.Attribute");
+        w.Open();
+        w.Summary("Color of the OptionSetValue.");
+        w.Line("public string Color { get; set; }");
+        w.Line();
+        w.Summary("Description of the OptionSetValue.");
+        w.Line("public string Description { get; set; }");
+        w.Line();
+        w.Summary("Display order index of the OptionSetValue.");
+        w.Line("public int DisplayIndex { get; set; }");
+        w.Line();
+        w.Summary("External value of the OptionSetValue.");
+        w.Line("public string ExternalValue { get; set; }");
+        w.Line();
+        w.Summary("Name of the OptionSetValue.");
+        w.Line("public string Name { get; set; }");
+        w.Line();
+        w.Summary($"Initializes a new instance of the {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} class.");
+        NonUserCode(w, settings);
+        w.Line($"public {EarlyBoundModelBuilder.OptionSetMetadataAttributeName}(string name, int displayIndex, string color = null, string description = null, string externalValue = null)");
+        w.Open();
+        w.Line("this.Color = color;");
+        w.Line("this.Description = description;");
+        w.Line("this.ExternalValue = externalValue;");
+        w.Line("this.DisplayIndex = displayIndex;");
+        w.Line("this.Name = name;");
         w.Close();
-        return w.ToString();
+        w.Close();
+
+        w.Line();
+        w.Summary("Extension class to handle retrieving of OptionSetMetadataAttribute.");
+        GeneratedCode(w, settings, options);
+        w.Line($"{visibility} static partial class {EarlyBoundModelBuilder.OptionSetExtensionName}");
+        w.Open();
+        w.Summary("Returns the OptionSetMetadataAttribute for the given enum value");
+        NonUserCode(w, settings);
+        w.Line($"public static {EarlyBoundModelBuilder.OptionSetMetadataAttributeName} GetMetadata<T>(this T value)");
+        w.Line("\twhere T : struct, System.IConvertible");
+        w.Open();
+        w.Line("System.Type enumType = typeof(T);");
+        w.Line("if (!enumType.IsEnum)");
+        w.Open();
+        w.Line("throw new System.ArgumentException(\"T must be an enum!\");");
+        w.Close();
+        w.Line("System.Reflection.MemberInfo[] members = enumType.GetMember(value.ToString());");
+        w.Line("for (int i = 0; (i < members.Length); i++)");
+        w.Open();
+        w.Line($"object[] attributes = members[i].GetCustomAttributes(typeof({EarlyBoundModelBuilder.OptionSetMetadataAttributeName}), false);");
+        w.Line("if (attributes.Length > 0)");
+        w.Open();
+        w.Line($"return (({EarlyBoundModelBuilder.OptionSetMetadataAttributeName})(attributes[0]));");
+        w.Close();
+        w.Close();
+        w.Line("throw new System.ArgumentException(\"T must be an enum adorned with an OptionSetMetadataAttribute!\");");
+        w.Close();
+        w.Close();
     }
 
     private static string EmitServiceContext(EarlyBoundModel model, string contextName, EmitOptions options)

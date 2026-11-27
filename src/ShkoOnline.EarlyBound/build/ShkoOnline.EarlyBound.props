@@ -8,6 +8,7 @@
   <ItemGroup>
     <CompilerVisibleProperty Include="RootNamespace" />
     <CompilerVisibleProperty Include="EarlyBoundNamespace" />
+    <CompilerVisibleProperty Include="EarlyBoundGenerateOnlyUsedAttributes" />
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="EarlyBound" />
   </ItemGroup>
 

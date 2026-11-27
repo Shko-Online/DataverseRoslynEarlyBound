@@ -135,6 +135,11 @@ internal sealed class ProjectConfiguration
         Line("  # Name of the generated OrganizationServiceContext. Leave empty to generate none.");
         Line("  serviceContextName: DataverseContext");
         Line();
+        Line("  # Generate members only for the columns and relationships this project's code uses.");
+        Line("  # A test project gets what it needs beyond that in classes such as AccountTestEntity.");
+        Line("  # Set to false when other projects use the generated classes directly.");
+        Line("  generateOnlyUsedAttributes: true");
+        Line();
         Line("  # Publisher prefixes and other words to recognise when PascalCasing names,");
         Line("  # so that sho_duedate becomes Sho_DueDate. 'earlybound pull' tells you which ones are missing.");
         Line("  camelCaseCustomWords: []");

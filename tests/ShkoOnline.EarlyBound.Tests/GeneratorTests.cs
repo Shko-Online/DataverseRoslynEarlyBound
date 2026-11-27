@@ -9,10 +9,12 @@ public class GeneratorTests
 {
     private const string ConfigPath = "/repo/earlybound.yaml";
 
+    // These tests are about the shape of everything that can be generated, so they generate all
+    // of it. What is generated when only used members are wanted is in OnlyUsedMembersTests.
     private static IReadOnlyList<(string, string)> Files(string? generatorSettings = null) =>
         Fixtures.MetadataFilesWith((ConfigPath, generatorSettings == null
-            ? Fixtures.Configuration
-            : "generator:\n  camelCaseCustomWords: [sho]\n" + generatorSettings));
+            ? Fixtures.FullConfiguration
+            : "generator:\n  camelCaseCustomWords: [sho]\n  generateOnlyUsedAttributes: false\n" + generatorSettings));
 
     [Theory]
     [InlineData(LanguageVersion.Latest)]
@@ -88,8 +90,8 @@ public class GeneratorTests
         var run = GeneratorHarness.Run(Files());
         Assert.Contains("public System.Collections.Generic.IEnumerable<ActivityParty> To", run.Source("Entities.Email.g.cs"));
 
-        var withoutParty = Fixtures.MetadataFiles().Select(f => f.Path.EndsWith("email.yaml")
-            ? (f.Path, f.Text.Substring(f.Text.IndexOf("  - logicalName: email", StringComparison.Ordinal)).Insert(0, "entities:\n"))
+        var withoutParty = Files().Select(f => f.Item1.EndsWith("email.yaml")
+            ? (f.Item1, f.Item2.Substring(f.Item2.IndexOf("  - logicalName: email", StringComparison.Ordinal)).Insert(0, "entities:\n"))
             : f).ToList();
         var untyped = GeneratorHarness.Run(withoutParty);
         Assert.Empty(untyped.CompilationErrors);
@@ -213,22 +215,5 @@ public class GeneratorTests
 
         var notYaml = GeneratorHarness.Run(new[] { ("/repo/notes.txt", "entities:\n  - logicalName: account\n") });
         Assert.Empty(notYaml.Result.GeneratedTrees);
-    }
-
-    [Fact]
-    public void Typing_in_a_code_file_regenerates_nothing()
-    {
-        var run = GeneratorHarness.Run(Files(), userSource: "class A { }");
-
-        // The same driver, and the same project with one C# file edited: what a host does on every keystroke.
-        var edited = run.InputCompilation.ReplaceSyntaxTree(
-            run.InputCompilation.SyntaxTrees.Single(),
-            CSharpSyntaxTree.ParseText("class A { void M() { } }", path: "Consumer.cs"));
-        var second = run.Driver.RunGenerators(edited).GetRunResult().Results.Single();
-
-        Assert.NotEmpty(second.TrackedOutputSteps);
-        Assert.All(
-            second.TrackedOutputSteps.SelectMany(step => step.Value).SelectMany(step => step.Outputs),
-            output => Assert.Equal(IncrementalStepRunReason.Cached, output.Reason));
     }
 }

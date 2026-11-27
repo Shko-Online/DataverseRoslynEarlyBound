@@ -11,6 +11,7 @@ internal sealed class ProjectMetadata
     private const string ItemMetadataKey = "build_metadata.AdditionalFiles.EarlyBound";
     private const string NamespacePropertyKey = "build_property.EarlyBoundNamespace";
     private const string RootNamespacePropertyKey = "build_property.RootNamespace";
+    private const string OnlyUsedPropertyKey = "build_property.EarlyBoundGenerateOnlyUsedAttributes";
     private const int MaxCached = 8;
 
     private static readonly object Gate = new();
@@ -19,13 +20,15 @@ internal sealed class ProjectMetadata
     private readonly MetadataFile[] _files;
     private readonly string? _rootNamespace;
     private readonly string? _explicitNamespace;
+    private readonly bool? _onlyUsedOverride;
     private readonly Lazy<EarlyBoundModel> _model;
 
-    private ProjectMetadata(MetadataFile[] files, string? rootNamespace, string? explicitNamespace)
+    private ProjectMetadata(MetadataFile[] files, string? rootNamespace, string? explicitNamespace, bool? onlyUsedOverride)
     {
         _files = files;
         _rootNamespace = rootNamespace;
         _explicitNamespace = explicitNamespace;
+        _onlyUsedOverride = onlyUsedOverride;
         Set = MetadataSet.Create(files);
         _model = new Lazy<EarlyBoundModel>(() => EarlyBoundModelBuilder.Build(Set, _rootNamespace, _explicitNamespace));
     }
@@ -34,6 +37,12 @@ internal sealed class ProjectMetadata
 
     /// <summary>The metadata with generated names resolved; built on first use.</summary>
     public EarlyBoundModel Model => _model.Value;
+
+    /// <summary>
+    /// True when the generator emits only the members the code uses, so that the others exist in
+    /// the metadata but not, or not yet, in the generated classes.
+    /// </summary>
+    public bool GeneratesOnlyUsed => _onlyUsedOverride ?? Set.Settings.GenerateOnlyUsedAttributes;
 
     /// <summary>Loads the metadata files of a project. Returns null when it has none.</summary>
     public static ProjectMetadata? Get(Project project, CancellationToken cancellationToken)
@@ -76,13 +85,15 @@ internal sealed class ProjectMetadata
         provider.GlobalOptions.TryGetValue(RootNamespacePropertyKey, out var rootNamespace);
         explicitNamespace = string.IsNullOrWhiteSpace(explicitNamespace) ? null : explicitNamespace!.Trim();
         rootNamespace = string.IsNullOrWhiteSpace(rootNamespace) ? project.DefaultNamespace : rootNamespace!.Trim();
+        provider.GlobalOptions.TryGetValue(OnlyUsedPropertyKey, out var onlyUsedText);
+        bool? onlyUsed = bool.TryParse(onlyUsedText?.Trim(), out var parsedOnlyUsed) ? parsedOnlyUsed : null;
 
         var array = files.ToArray();
         lock (Gate)
         {
             for (var node = Recent.First; node != null; node = node.Next)
             {
-                if (node.Value.Matches(array, rootNamespace, explicitNamespace))
+                if (node.Value.Matches(array, rootNamespace, explicitNamespace, onlyUsed))
                 {
                     if (node != Recent.First)
                     {
@@ -95,7 +106,7 @@ internal sealed class ProjectMetadata
             }
         }
 
-        var created = new ProjectMetadata(array, rootNamespace, explicitNamespace);
+        var created = new ProjectMetadata(array, rootNamespace, explicitNamespace, onlyUsed);
         if (created.Set.IsEmpty)
         {
             return null;
@@ -113,9 +124,10 @@ internal sealed class ProjectMetadata
         return created;
     }
 
-    private bool Matches(MetadataFile[] files, string? rootNamespace, string? explicitNamespace)
+    private bool Matches(MetadataFile[] files, string? rootNamespace, string? explicitNamespace, bool? onlyUsedOverride)
     {
         if (files.Length != _files.Length
+            || onlyUsedOverride != _onlyUsedOverride
             || !string.Equals(rootNamespace, _rootNamespace, StringComparison.Ordinal)
             || !string.Equals(explicitNamespace, _explicitNamespace, StringComparison.Ordinal))
         {

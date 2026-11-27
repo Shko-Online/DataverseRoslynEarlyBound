@@ -17,6 +17,8 @@ Environment:
     LSP_WARMUP=1   ask for diagnostics first, as an editor does when a file opens. Needed for
                    completions that depend on generated types.
     LSP_DIAG=1     also print hover, diagnostics and server log messages.
+    LSP_EDIT=...   '<old text>=><new text>', several separated by ';;'. Each is typed into the
+                   open file, and the compiler errors that remain are printed.
 
 Example (after "dotnet pack -c Release" and "dotnet build samples/Samples.slnx"):
     LSP_WARMUP=1 python3 eng/verify-language-server.py "$SERVER" \
@@ -156,6 +158,27 @@ for marker, expected in checks:
     status = "OK  " if len(found) == len(expected.split(",")) else "FAIL"
     if status == "FAIL": ok = False
     print(f"{status} {marker!r}: {len(labels)} items; expected {expected}; first: {labels[:8]}")
+
+if os.environ.get("LSP_EDIT"):
+    # LSP_EDIT='<old text>=><new text>[;;<old>=><new>...]': type each change into the open file and
+    # report the compiler's errors afterwards. Shows whether a member used for the first time is
+    # generated while editing, without a build.
+    for change in os.environ["LSP_EDIT"].split(";;"):
+        old_text, _, new_text = change.partition("=>")
+        if old_text not in text:
+            print(f"EDIT TEXT NOT FOUND: {old_text!r}"); ok = False; continue
+        text = text.replace(old_text, new_text, 1)
+        version += 1
+        notify("textDocument/didChange", {"textDocument": {"uri": uri(source), "version": version}, "contentChanges": [{"text": text}]})
+        errors = None
+        for attempt in range(20):
+            diag = request("textDocument/diagnostic", {"textDocument": {"uri": uri(source)}, "identifier": "DocumentCompilerSemantic"}, timeout=120)
+            errors = [d for d in (diag or {}).get("items", []) if d.get("severity") == 1]
+            if not errors:
+                break
+            time.sleep(0.5)
+        summary = "no errors" if not errors else "; ".join(f"{d.get('code')}: {d.get('message')[:90]}" for d in errors[:3])
+        print(f"EDIT {new_text!r}: {summary}")
 
 if os.environ.get("LSP_DIAG"):
     idx = text.find("ToEntity<Sho_Project>") + len("ToEntity<Sho_")

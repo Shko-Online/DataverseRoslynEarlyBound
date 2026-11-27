@@ -70,8 +70,9 @@ dotnet earlybound solutions
 
 ### `generate`
 
-Writes the C# the source generator would produce to a folder. For toolchains that cannot run
-source generators, and for reading the output.
+Writes the C# the source generator can produce to a folder. For toolchains that cannot run
+source generators, and for reading the output. It looks at no code, so it writes every member,
+not only the used ones.
 
 ```console
 dotnet earlybound generate --output Generated

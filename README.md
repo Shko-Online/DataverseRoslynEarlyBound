@@ -68,7 +68,75 @@ for XrmToolBox, so a project that used it can switch without touching its code.
 - **PascalCase for lower-case schema names.** `new_duedate` becomes `New_DueDate`, using the
   Early Bound Generator's word list.
 
-The generated code compiles as C# 7.3, so it works in .NET Framework plug-in projects.
+Every generated class is `partial`, so you can add to it in a file of your own. The generated
+code compiles as C# 7.3, so it works in .NET Framework plug-in projects.
+
+## Only what you use
+
+A table like `account` has a few hundred columns, and a plug-in touches a dozen of them. So
+members are generated only for the columns and relationships your project's code mentions. For
+a project that uses a handful of members of `account` and `contact`, that came to 834 generated
+lines instead of 11,378, and a 15 KB assembly instead of 124 KB.
+
+Use is decided by name: a member is generated when its name appears in the project's C# code,
+as `account.CreditLimit`, `new Account { CreditLimit = … }`, `Account.Fields.CreditLimit`,
+`nameof(Account.CreditLimit)` or in any other form. The class itself, its name constants and its
+primary key are always generated. An enum is generated when a generated property is typed as
+it, or when you write its name.
+
+IntelliSense still shows the whole table. After `account.`, in an object initializer and under
+`Account.Fields.`, the autocomplete provider lists the members that are not generated yet next
+to the ones that are. Pick one and it is generated, in the editor, without a build.
+
+### In a test project
+
+Tests need more of a table than the plug-ins touch: to set a row up, or to check it afterwards.
+Those members are not added to the plug-in assembly for the tests' sake. Give the test project
+the package and point it at the plug-in project's metadata:
+
+```xml
+<PropertyGroup>
+  <EarlyBoundMetadataRoot>..\Contoso.Plugins</EarlyBoundMetadataRoot>
+</PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="..\Contoso.Plugins\Contoso.Plugins.csproj" />
+  <PackageReference Include="ShkoOnline.EarlyBound" Version="…" PrivateAssets="all" />
+</ItemGroup>
+```
+
+The test project does not generate `Account` again; it uses the plug-in project's. Write
+`AccountTestEntity` and a class deriving from `Account` is generated in the test project, with a
+member for everything your tests use that `Account` lacks:
+
+```csharp
+var customer = new AccountTestEntity
+{
+    Name = "Contoso",                 // Account has this, because a plug-in uses it
+    CreditLimit = new Money(0m),      // AccountTestEntity adds this, because this test uses it
+};
+
+ProjectDueDatePlugin.ApplyDefaults(project, customer, today);   // it is an Account
+```
+
+An `AccountTestEntity` is an `Account`, so it goes wherever plug-in code expects one. It works
+in any C# version. [samples/Contoso.Plugins.Tests](samples/Contoso.Plugins.Tests) shows it.
+
+### When to generate everything
+
+The generator only sees the project it runs in. Turn this off, or name what to keep, when:
+
+- another project uses the generated classes directly, such as an application that references
+  a shared model library;
+- members are reached through reflection, or from code that another source generator writes,
+  such as Razor components.
+
+```yaml
+generator:
+  generateOnlyUsedAttributes: false     # generate everything
+  alwaysGenerate: [contact, "*.statecode", account.creditlimit]   # or keep these regardless
+```
+
+See [docs/configuration.md](docs/configuration.md#only-used-members).
 
 ## Autocomplete in late-bound code
 
@@ -80,6 +148,8 @@ display names and descriptions.
 | `new Entity("`, `service.Retrieve("`, `new QueryExpression("`, `entity.LogicalName == "` | Tables |
 | `entity["`, `entity.GetAttributeValue<string>("`, `new ColumnSet("`, `AddCondition("`, `AddOrder("` | Columns of the table that code is about |
 | `new Relationship("` | Relationships |
+| `account.`, `new Account { `, `Account.Fields.` | The members of the class that are not generated yet, because nothing uses them |
+| `new ` in a test project | `AccountTestEntity` and the other classes that add members to the plug-in project's |
 | `<entity name='`, `<attribute name='`, `<condition attribute='`, `<link-entity from='` in a FetchXML string | Tables and columns, by where you are in the query |
 | `operator='` in FetchXML | The FetchXML operators |
 | `new OptionSetValue(`, `AddCondition("statuscode", ConditionOperator.Equal, `, `.Value == `, `value='` in FetchXML | The options of that choice column |
@@ -158,7 +228,8 @@ listed in [docs/configuration.md](docs/configuration.md).
 **Early Bound Generator.** Class, property, enum and option names are derived by the same rules
 and the same word list, and its default settings are the defaults here. Copy your non-default
 settings into the `generator` section. Not generated: request and response classes for messages
-and custom APIs, and `INotifyPropertyChanged`.
+and custom APIs, and `INotifyPropertyChanged`. Unlike that tool, members nothing uses are left
+out by default; see [Only what you use](#only-what-you-use).
 
 **`pac modelbuilder` and CrmSvcUtil.** Their names differ where the Early Bound Generator's do:
 enums are `Account_AccountCategoryCode` rather than `account_accountcategorycode`, and
@@ -207,7 +278,7 @@ dotnet build samples/Samples.slnx  # the samples consume those packages
 | `src/ShkoOnline.EarlyBound.Completion` | The completion provider. |
 | `src/ShkoOnline.EarlyBound` | The NuGet package that carries the three above, and its MSBuild files. |
 | `src/ShkoOnline.EarlyBound.Tool` | The `earlybound` command. |
-| `samples` | A plug-in project and a console app that use the packages. |
+| `samples` | A plug-in project, its test project and a console app that use the packages. |
 
 ## Licence
 

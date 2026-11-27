@@ -40,19 +40,28 @@ public sealed class EarlyBoundCompletionProvider : CompletionProvider
                 // The opening quote of a name: entity[" or <entity name='
                 return true;
 
+            case ' ':
+                // A member slot in an initializer, or a value slot.
+                return IsAtStartOfInitializerMember(text, caretPosition - 1) || LineContainsAny(text, caretPosition, ChoiceHints);
+
             case '(':
             case ',':
-            case ' ':
             case '=':
                 // A value slot, but only on lines that can hold a choice value.
                 return LineContainsAny(text, caretPosition, ChoiceHints);
 
             default:
-                // The first character of a name, right after its opening quote.
                 if ((char.IsLetterOrDigit(typed) || typed == '_') && caretPosition >= 2)
                 {
+                    // The first character of a name, right after its opening quote.
                     var before = text[caretPosition - 2];
-                    return before == '"' || before == '\'';
+                    if (before == '"' || before == '\'')
+                    {
+                        return true;
+                    }
+
+                    // The first character of a member in an initializer: new Account { N
+                    return !IsIdentifierCharacter(before) && IsAtStartOfInitializerMember(text, caretPosition - 1);
                 }
 
                 return false;
@@ -89,7 +98,9 @@ public sealed class EarlyBoundCompletionProvider : CompletionProvider
             {
                 await CompleteInStringAsync(context, metadata, literal, text, position).ConfigureAwait(false);
             }
-            else if (!IsInCommentOrString(root, position))
+            else if (!IsInCommentOrString(root, position)
+                && !await CompleteMembersAsync(context, metadata, root, position).ConfigureAwait(false)
+                && !await CompleteTestEntityNamesAsync(context, metadata, root, position).ConfigureAwait(false))
             {
                 await CompleteChoiceValueAsync(context, metadata, root, position).ConfigureAwait(false);
             }
@@ -181,6 +192,60 @@ public sealed class EarlyBoundCompletionProvider : CompletionProvider
         context.AddItems(names);
     }
 
+    /// <summary>
+    /// With only used members generated, offers the others where a member is being written, so the
+    /// whole table stays discoverable. Picking one puts its name in the code, and the generator adds it.
+    /// </summary>
+    private static async Task<bool> CompleteMembersAsync(CompletionContext context, ProjectMetadata metadata, SyntaxNode root, int position)
+    {
+        if (!metadata.GeneratesOnlyUsed || !MemberContextAnalyzer.MayBeMemberSlot(root, position))
+        {
+            return false;
+        }
+
+        var cancellationToken = context.CancellationToken;
+        var model = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var request = model == null ? null : MemberContextAnalyzer.Analyze(root, position, model, metadata, cancellationToken);
+        if (request == null)
+        {
+            return false;
+        }
+
+        // The compiler's completion for an object initializer shows members and nothing else, and
+        // says so by being exclusive. Entries that are to appear next to its own have to say the same.
+        if (request.Kind == MemberContextKind.Initializer && (request.Attributes.Count > 0 || request.Relationships.Count > 0))
+        {
+            context.IsExclusive = true;
+        }
+
+        // The list's span is left alone: these entries join the compiler's own members.
+        context.AddItems(CompletionItems.Members(request));
+        return true;
+    }
+
+    /// <summary>
+    /// After <c>new</c>, in a project whose table classes come from a reference: offers the classes
+    /// derived from them (<c>AccountTestEntity</c>) that the code has not named yet.
+    /// </summary>
+    private static async Task<bool> CompleteTestEntityNamesAsync(CompletionContext context, ProjectMetadata metadata, SyntaxNode root, int position)
+    {
+        if (!metadata.GeneratesOnlyUsed || !MemberContextAnalyzer.IsAfterNew(root, position))
+        {
+            return false;
+        }
+
+        var cancellationToken = context.CancellationToken;
+        var model = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        var candidates = model == null ? null : MemberContextAnalyzer.AnalyzeObjectCreation(root, position, model, metadata, cancellationToken);
+        if (candidates == null)
+        {
+            return false;
+        }
+
+        context.AddItems(CompletionItems.TestEntities(candidates));
+        return true;
+    }
+
     private static async Task CompleteChoiceValueAsync(CompletionContext context, ProjectMetadata metadata, SyntaxNode root, int position)
     {
         var cancellationToken = context.CancellationToken;
@@ -196,21 +261,31 @@ public sealed class EarlyBoundCompletionProvider : CompletionProvider
             return;
         }
 
-        // Prefer the generated enum over a magic number when the project has it.
+        // Prefer the generated enum over a magic number. When only used members are generated the
+        // enum may not exist yet; writing its name is what brings it into being, so the class of
+        // its table is enough to know the generator is at work here.
         Func<OptionDefinition, string?>? insertion = null;
-        var generated = owner == null ? null : metadata.Model.FindEntity(owner.LogicalName)?.FindAttribute(request.AttributeLogicalName)?.OptionSet;
+        var ownerModel = owner == null ? null : metadata.Model.FindEntity(owner.LogicalName);
+        var generated = ownerModel?.FindAttribute(request.AttributeLogicalName)?.OptionSet;
         if (generated != null)
         {
-            var enumType = model.Compilation.GetTypeByMetadataName(metadata.Model.Namespace + "." + generated.EnumName.TrimStart('@'));
-            if (enumType != null && enumType.TypeKind == TypeKind.Enum)
+            var @namespace = metadata.Model.Namespace;
+            var enumType = model.Compilation.GetTypeByMetadataName(@namespace + "." + generated.EnumName.TrimStart('@'));
+            var anchor = enumType;
+            if (anchor == null && metadata.GeneratesOnlyUsed)
             {
-                var inScope = model.LookupNamespacesAndTypes(position, name: enumType.Name)
-                    .Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, enumType));
-                var typeName = inScope ? generated.EnumName : metadata.Model.Namespace + "." + generated.EnumName;
+                anchor = model.Compilation.GetTypeByMetadataName(@namespace + "." + ownerModel!.ClassName.TrimStart('@'));
+            }
+
+            if (anchor != null && (enumType == null || enumType.TypeKind == TypeKind.Enum))
+            {
+                var inScope = model.LookupNamespacesAndTypes(position, name: anchor.Name)
+                    .Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, anchor));
+                var typeName = inScope ? generated.EnumName : @namespace + "." + generated.EnumName;
                 insertion = option =>
                 {
                     var member = generated.FindOption(option.Value)?.MemberName;
-                    return member != null && enumType.GetMembers(member.TrimStart('@')).Length > 0
+                    return member != null && (enumType == null || enumType.GetMembers(member.TrimStart('@')).Length > 0)
                         ? "(int)" + typeName + "." + member
                         : null;
                 };
@@ -297,6 +372,28 @@ public sealed class EarlyBoundCompletionProvider : CompletionProvider
         var insertion = item.Properties.TryGetValue(CompletionItems.InsertionKey, out var custom) ? custom : item.DisplayText;
         return Task.FromResult(CompletionChange.Create(new TextChange(item.Span, insertion)));
     }
+
+    /// <summary>
+    /// True when what precedes <paramref name="position"/>, whitespace aside, is the <c>{</c> or
+    /// <c>,</c> that a member of an initializer follows. A look at the text only: whether it really
+    /// is the initializer of a generated class is decided when completions are computed.
+    /// </summary>
+    /// <remarks>
+    /// The compiler's completion for object initializers is exclusive, and only providers that
+    /// report being triggered get to add to an exclusive list.
+    /// </remarks>
+    private static bool IsAtStartOfInitializerMember(SourceText text, int position)
+    {
+        var i = position - 1;
+        while (i >= 0 && char.IsWhiteSpace(text[i]))
+        {
+            i--;
+        }
+
+        return i >= 0 && (text[i] == '{' || text[i] == ',');
+    }
+
+    private static bool IsIdentifierCharacter(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     /// <summary>The run of name characters around the caret, limited to the literal's content.</summary>
     private static TextSpan WordSpan(SourceText text, int position, TextSpan content, bool allowHyphenAndSpace)

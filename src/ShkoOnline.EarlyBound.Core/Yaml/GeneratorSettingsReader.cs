@@ -13,6 +13,8 @@ internal static class GeneratorSettingsReader
         ["namespace"] = (s, v, c) => s.Namespace = c.String(v),
         ["serviceContextName"] = (s, v, c) => s.ServiceContextName = c.String(v),
         ["generateTypesAsInternal"] = (s, v, c) => s.GenerateTypesAsInternal = c.Bool(v, "generateTypesAsInternal") ?? s.GenerateTypesAsInternal,
+        ["generateOnlyUsedAttributes"] = (s, v, c) => s.GenerateOnlyUsedAttributes = c.Bool(v, "generateOnlyUsedAttributes") ?? s.GenerateOnlyUsedAttributes,
+        ["alwaysGenerate"] = (s, v, c) => s.AlwaysGenerate = c.StringList(v, "alwaysGenerate"),
 
         ["camelCaseClassNames"] = (s, v, c) => s.CamelCaseClassNames = c.Bool(v, "camelCaseClassNames") ?? s.CamelCaseClassNames,
         ["camelCaseMemberNames"] = (s, v, c) => s.CamelCaseMemberNames = c.Bool(v, "camelCaseMemberNames") ?? s.CamelCaseMemberNames,
